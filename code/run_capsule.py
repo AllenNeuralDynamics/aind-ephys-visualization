@@ -83,6 +83,7 @@ if __name__ == "__main__":
         data_processes_spikesorting_folder =  data_folder / "data_processes_spikesorting"
 
     ecephys_sessions = [p for p in data_folder.iterdir() if "ecephys" in p.name.lower()]
+    print(f"Sessions: {ecephys_sessions}")
     assert len(ecephys_sessions) == 1, f"Attach one session at a time {ecephys_sessions}"
     session = ecephys_sessions[0]
     session_name = session.name
