@@ -19,6 +19,10 @@ import spikeinterface.qualitymetrics as sqm
 import spikeinterface.widgets as sw
 from spikeinterface.core.core_tools import check_json
 
+from spikeinterface.sortingcomponents.peak_pipeline import ExtractDenseWaveforms
+from spikeinterface.sortingcomponents.peak_detection import detect_peaks
+from spikeinterface.sortingcomponents.peak_localization import LocalizeCenterOfMass
+
 # VIZ
 import matplotlib
 import matplotlib.pyplot as plt
@@ -122,6 +126,7 @@ if __name__ == "__main__":
             peak_amps = np.concatenate(we.load_extension("spike_amplitudes").get_data())
         # otherwise etect peaks
         else:
+
             print(f"\tVisualizing drift maps using detected peaks (no spike sorting available)")
             # locally_exclusive + pipeline steps LocalizeCenterOfMass + PeakToPeakFeature
             drift_data = preprocessing_vizualization_data[recording_name]["drift"]
