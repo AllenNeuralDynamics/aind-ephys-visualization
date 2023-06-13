@@ -87,7 +87,6 @@ if __name__ == "__main__":
         data_processes_spikesorting_folder =  data_folder / "data_processes_spikesorting"
 
     ecephys_sessions = [p for p in data_folder.iterdir() if "ecephys" in p.name.lower()]
-    print(f"Sessions: {ecephys_sessions}")
     assert len(ecephys_sessions) == 1, f"Attach one session at a time {ecephys_sessions}"
     session = ecephys_sessions[0]
     session_name = session.name
@@ -319,6 +318,7 @@ if __name__ == "__main__":
         t_visualization_end = time.perf_counter()
         elapsed_time_visualization = np.round(t_visualization_end - t_visualization_start, 2)
 
+        visualization_params["recording_name"] = recording_name
         visualization_process = DataProcess(
             name="Ephys visualization",
             version=VERSION, # either release or git commit
@@ -328,6 +328,7 @@ if __name__ == "__main__":
             output_location=str(results_folder),
             code_url=URL,
             parameters=visualization_params,
+            outputs=visualization_output,
             notes=visualization_notes
         )
         with open(visualization_output_process_json, "w") as f:
