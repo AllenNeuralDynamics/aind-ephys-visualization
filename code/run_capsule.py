@@ -91,8 +91,10 @@ if __name__ == "__main__":
     session = ecephys_sessions[0]
     session_name = session.name
 
+    preprocessed_recording_folders = [p for p in preprocessed_folder.iterdir() if p.is_dir()]
+
     # loop through block-streams
-    for recording_folder in preprocessed_folder.iterdir():
+    for recording_folder in preprocessed_recording_folders:
         t_visualization_start = time.perf_counter()
         datetime_start_visualization = datetime.now()
         visualization_output = {}
@@ -132,7 +134,7 @@ if __name__ == "__main__":
             print(f"\tVisualizing drift maps using detected peaks (no spike sorting available)")
             # locally_exclusive + pipeline steps LocalizeCenterOfMass + PeakToPeakFeature
             drift_data = preprocessing_vizualization_data[recording_name]["drift"]
-            recording = si.load_extractor(drift_data["recording"], base_folder=".")
+            recording = si.load_extractor(drift_data["recording"], base_folder=data_folder)
             extract_dense_waveforms = ExtractDenseWaveforms(recording, ms_before=visualization_params["drift"]["localization"]["ms_before"],
                                                             ms_after=visualization_params["drift"]["localization"]["ms_after"], return_output=False)
             localize_peaks = LocalizeCenterOfMass(recording, local_radius_um=visualization_params["drift"]["localization"]["local_radius_um"], 
@@ -196,7 +198,7 @@ if __name__ == "__main__":
             recording_full_loaded = {}
             for layer, rec_dict in recording_full_dict.items():
                 try:
-                    rec = si.load_extractor(rec_dict, base_folder=".")
+                    rec = si.load_extractor(rec_dict, base_folder=data_folder)
                 except:
                     print(f"\t\tCould not load layer {layer}. Skipping")
                     continue
@@ -209,7 +211,7 @@ if __name__ == "__main__":
                 recording_proc_loaded = {}
                 for layer, rec_dict in recording_proc_dict.items():
                     try:
-                        rec = si.load_extractor(rec_dict, base_folder=".")
+                        rec = si.load_extractor(rec_dict, base_folder=data_folder)
                     except:
                         print(f"\t\tCould not load layer {layer}. Skipping")
                         continue
