@@ -55,7 +55,6 @@ job_kwargs = {
 }
 
 data_folder = Path("../data/")
-scratc_folder = Path("../scratch")
 results_folder = Path("../results/")
 
 
