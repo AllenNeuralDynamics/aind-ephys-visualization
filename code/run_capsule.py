@@ -61,14 +61,15 @@ results_folder = Path("../results/")
 if __name__ == "__main__":
     data_processes_folder = results_folder / "data_processes_visualization"
     data_processes_folder.mkdir(exist_ok=True)
+    visualization_output_folder = results_folder / "visualization_output"
+    visualization_output_folder.mkdir(exist_ok=True)
     
     si.set_global_job_kwargs(**job_kwargs)
 
     ###### VISUALIZATION #########
     print("\n\nVISUALIZATION")
-    t_visualization_start = time.perf_counter()
+    t_visualization_start_all = time.perf_counter()
     datetime_start_visualization = datetime.now()
-    visualization_output = {}
 
     # check if test
     if (data_folder / "postprocessing_output_test").is_dir():
@@ -93,8 +94,13 @@ if __name__ == "__main__":
 
     # loop through block-streams
     for recording_folder in preprocessed_folder.iterdir():
+        t_visualization_start = time.perf_counter()
+        datetime_start_visualization = datetime.now()
+        visualization_output = {}
         recording_name = recording_folder.name
         waveforms_folder = postprocessed_folder / recording_name
+        visualization_output_process_json = data_processes_folder / f"visualization_{recording_name}.json"
+
         print(f"Visualizing recording: {recording_name}")
 
         # retrieve sorter name
@@ -104,9 +110,7 @@ if __name__ == "__main__":
 
         with open(visualization_folder / f"{recording_name}.json", "r") as f:
             preprocessing_vizualization_data = json.load(f)
-        
-        if recording_name not in visualization_output:
-            visualization_output[recording_name] = {}
+
         recording_processed = si.load_extractor(recording_folder)
 
         # drift
@@ -252,7 +256,7 @@ if __name__ == "__main__":
                 try:
                     url = v_timeseries.url(label=f"{session_name} - {recording_name}")
                     print(f"\n{url}\n")
-                    visualization_output[recording_name]["timeseries"] = url
+                    visualization_output["timeseries"] = url
                 except Exception as e:
                     print("KCL error", e)
             except Exception as e:
@@ -293,29 +297,29 @@ if __name__ == "__main__":
                 state = dict(sortingCuration=gh_path)
                 url = v_summary.url(label=f"{session_name} - {recording_name} - {sorter_name} - Sorting Summary", state=state)
                 print(f"\n{url}\n")
-                visualization_output[recording_name]["sorting_summary"] = url
+                visualization_output["sorting_summary"] = url
 
             except Exception as e:
                 print("KCL error", e)
         else:
             print("No units after curation!")
 
-    # save params in output
-    visualization_notes = json.dumps(visualization_output, indent=4)
-    # replace special characters
-    visualization_notes = visualization_notes.replace('\\"', "%22")
-    visualization_notes = visualization_notes.replace('#', "%23")
+        # save params in output
+        visualization_notes = json.dumps(visualization_output, indent=4)
+        # replace special characters
+        visualization_notes = visualization_notes.replace('\\"', "%22")
+        visualization_notes = visualization_notes.replace('#', "%23")
 
-    # save vizualization output
-    visualization_output_file = results_folder / "visualization_output.json"
-    # remove escape characters
-    visualization_output_file.write_text(visualization_notes)
+        # save vizualization output
+        visualization_output_file = visualization_output_folder / f"{recording_name}.json"
+        # remove escape characters
+        visualization_output_file.write_text(visualization_notes)
 
-    # save vizualization output
-    t_visualization_end = time.perf_counter()
-    elapsed_time_visualization = np.round(t_visualization_end - t_visualization_start, 2)
+        # save vizualization output
+        t_visualization_end = time.perf_counter()
+        elapsed_time_visualization = np.round(t_visualization_end - t_visualization_start, 2)
 
-    visualization_process = DataProcess(
+        visualization_process = DataProcess(
             name="Ephys visualization",
             version=VERSION, # either release or git commit
             start_date_time=datetime_start_visualization,
@@ -326,4 +330,13 @@ if __name__ == "__main__":
             parameters=visualization_params,
             notes=visualization_notes
         )
-    print(f"VISUALIZATION time: {elapsed_time_visualization}s")
+        with open(visualization_output_process_json, "w") as f:
+            f.write(visualization_process.json(indent=3))
+
+    # save vizualization output
+    t_visualization_end_all = time.perf_counter()
+    elapsed_time_visualization_all = np.round(t_visualization_end_all - t_visualization_start_all, 2)
+
+    
+    print(f"VISUALIZATION time: {elapsed_time_visualization_all}s")
+
