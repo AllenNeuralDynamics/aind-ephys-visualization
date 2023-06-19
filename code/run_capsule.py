@@ -99,10 +99,10 @@ if __name__ == "__main__":
     curated_folders = [p for p in sorting_precurated_folder.iterdir() if p.is_dir()]
 
     print("*** Input data ***")
-    print(f"Preprocessed folder: {preprocessed_folders}")
-    print(f"Spikesorted folder: {spikesorted_folders}")
-    print(f"Postprocessed folder: {postprocessed_folders}")
-    print(f"Curated folder: {curated_folders}")
+    print(f"Preprocessed folder: {[p.name for p in preprocessed_folders]}")
+    print(f"Spikesorted folder: {[p.name for p in spikesorted_folders]}")
+    print(f"Postprocessed folder: {[p.name for p in postprocessed_folders]}")
+    print(f"Curated folder: {[p.name for p in curated_folders]}")
 
     # loop through block-streams
     for recording_folder in preprocessed_folders:
