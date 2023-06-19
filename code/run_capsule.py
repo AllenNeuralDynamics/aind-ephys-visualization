@@ -95,7 +95,7 @@ if __name__ == "__main__":
 
     preprocessed_folders = [p for p in preprocessed_folder.iterdir() if p.is_dir()]
     spikesorted_folders = [p for p in spikesorted_folder.iterdir() if p.is_dir()]
-    postprocessed_folders = [p for p in postprocessed_folder.iterdir() if p.is_dir()]
+    postprocessed_folders = [p for p in postprocessed_folder.iterdir() if p.is_dir() and "_sorting" not in p.name]
     curated_folders = [p for p in sorting_precurated_folder.iterdir() if p.is_dir()]
 
     print("*** Input data ***")
