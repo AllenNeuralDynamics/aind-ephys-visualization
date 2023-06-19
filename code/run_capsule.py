@@ -78,12 +78,14 @@ if __name__ == "__main__":
         preprocessed_folder = data_folder / "preprocessing_output_test" / "preprocessed"
         visualization_folder = data_folder / "preprocessing_output_test" / "visualization_preprocessed"
         sorting_precurated_folder = data_folder / "curation_output_test" / "sorting_precurated"
+        spikesorted_folder = data_folder / "spikesorting_output_test" / "spikesorted"
         data_processes_spikesorting_folder =  data_folder / "spikesorting_output_test" / "data_processes_spikesorting"
     else:
         postprocessed_folder = data_folder / "postprocessed"
         preprocessed_folder = data_folder / "preprocessed"
         visualization_folder = data_folder / "visualization_preprocessed"
         sorting_precurated_folder = data_folder / "sorting_precurated"
+        spikesorted_folder = data_folder / "spikesorted"
         data_processes_spikesorting_folder =  data_folder / "data_processes_spikesorting"
 
     ecephys_sessions = [p for p in data_folder.iterdir() if "ecephys" in p.name.lower()]
@@ -91,10 +93,19 @@ if __name__ == "__main__":
     session = ecephys_sessions[0]
     session_name = session.name
 
-    preprocessed_recording_folders = [p for p in preprocessed_folder.iterdir() if p.is_dir()]
+    preprocessed_folders = [p for p in preprocessed_folder.iterdir() if p.is_dir()]
+    spikesorted_folders = [p for p in spikesorted_folder.iterdir() if p.is_dir()]
+    postprocessed_folders = [p for p in postprocessed_folder.iterdir() if p.is_dir()]
+    curated_folders = [p for p in sorting_precurated_folder.iterdir() if p.is_dir()]
+
+    print("*** Input data ***")
+    print(f"Preprocessed folder: {preprocessed_folders}")
+    print(f"Spikesorted folder: {spikesorted_folders}")
+    print(f"Postprocessed folder: {postprocessed_folders}")
+    print(f"Curated folder: {curated_folders}")
 
     # loop through block-streams
-    for recording_folder in preprocessed_recording_folders:
+    for recording_folder in preprocessed_folders:
         t_visualization_start = time.perf_counter()
         datetime_start_visualization = datetime.now()
         visualization_output = {}
