@@ -55,14 +55,12 @@ job_kwargs = {
 }
 
 data_folder = Path("../data/")
+scratch_folder = Path("../scratch")
 results_folder = Path("../results/")
 
 
 if __name__ == "__main__":
-    data_processes_folder = results_folder / "data_processes_visualization"
-    data_processes_folder.mkdir(exist_ok=True)
-    visualization_output_folder = results_folder / "visualization_output"
-    visualization_output_folder.mkdir(exist_ok=True)
+    data_process_prefix = "data_process_visualization"
     
     si.set_global_job_kwargs(**job_kwargs)
 
@@ -72,58 +70,58 @@ if __name__ == "__main__":
     datetime_start_visualization = datetime.now()
 
     # check if test
-    if (data_folder / "postprocessing_output_test").is_dir():
+    if (data_folder / "postprocessing_pipeline_output_test").is_dir():
         print("\n*******************\n**** TEST MODE ****\n*******************\n")
-        postprocessed_folder = data_folder / "postprocessing_output_test" / "postprocessed"
-        preprocessed_folder = data_folder / "preprocessing_output_test" / "preprocessed"
-        visualization_folder = data_folder / "preprocessing_output_test" / "visualization_preprocessed"
-        sorting_precurated_folder = data_folder / "curation_output_test" / "sorting_precurated"
-        spikesorted_folder = data_folder / "spikesorting_output_test" / "spikesorted"
-        data_processes_spikesorting_folder =  data_folder / "spikesorting_output_test" / "data_processes_spikesorting"
+        postprocessed_folder = data_folder / "postprocessing_pipeline_output_test"
+        preprocessed_folder = data_folder / "preprocessing_pipeline_output_test"
+        visualization_folder = data_folder / "preprocessing_pipeline_output_test"
+        curation_folder = data_folder / "curation_pipeline_output_test"
+        spikesorted_folder = data_folder / "spikesorting_pipeline_output_test"
+        skip_timeseries = False
     else:
-        postprocessed_folder = data_folder / "postprocessed"
-        preprocessed_folder = data_folder / "preprocessed"
-        visualization_folder = data_folder / "visualization_preprocessed"
-        sorting_precurated_folder = data_folder / "sorting_precurated"
-        spikesorted_folder = data_folder / "spikesorted"
-        data_processes_spikesorting_folder =  data_folder / "data_processes_spikesorting"
+        postprocessed_folder = data_folder
+        preprocessed_folder = data_folder
+        visualization_folder = data_folder
+        curation_folder = data_folder
+        spikesorted_folder = data_folder
+        data_processes_spikesorting_folder =  data_folder
+        skip_timeseries = False
 
     ecephys_sessions = [p for p in data_folder.iterdir() if "ecephys" in p.name.lower()]
     assert len(ecephys_sessions) == 1, f"Attach one session at a time {ecephys_sessions}"
     session = ecephys_sessions[0]
     session_name = session.name
 
-    preprocessed_folders = [p for p in preprocessed_folder.iterdir() if p.is_dir()]
-    spikesorted_folders = [p for p in spikesorted_folder.iterdir() if p.is_dir()]
-    postprocessed_folders = [p for p in postprocessed_folder.iterdir() if p.is_dir() and "_sorting" not in p.name]
-    curated_folders = [p for p in sorting_precurated_folder.iterdir() if p.is_dir()]
+    preprocessed_folders = [p for p in preprocessed_folder.iterdir() if p.is_dir() and "preprocessed_" in p.name]
+    spikesorted_folders = [p for p in spikesorted_folder.iterdir() if p.is_dir() and "spikesorted_" in p.name]
+    postprocessed_folders = [p for p in postprocessed_folder.iterdir() if p.is_dir() and "postprocessed_" in p.name and "-sorting" not in p.name]
+    curated_folders = [p for p in curation_folder.iterdir() if p.is_dir() and  "curated_" in p.name]
 
-    print("*** Input data ***")
-    print(f"Preprocessed folder: {[p.name for p in preprocessed_folders]}")
-    print(f"Spikesorted folder: {[p.name for p in spikesorted_folders]}")
-    print(f"Postprocessed folder: {[p.name for p in postprocessed_folders]}")
-    print(f"Curated folder: {[p.name for p in curated_folders]}")
 
     # loop through block-streams
-    for recording_folder in preprocessed_folders:
+    for preprocessed_folder in preprocessed_folders:
         t_visualization_start = time.perf_counter()
         datetime_start_visualization = datetime.now()
         visualization_output = {}
-        recording_name = recording_folder.name
-        waveforms_folder = postprocessed_folder / recording_name
-        visualization_output_process_json = data_processes_folder / f"visualization_{recording_name}.json"
+    
+        recording_name = ("_").join(preprocessed_folder.name.split("_")[1:])
+        waveforms_folder = postprocessed_folder / f"postprocessed_{recording_name}"
+        visualization_output_process_json = results_folder / f"{data_process_prefix}_{recording_name}.json"
+        # save vizualization output
+        visualization_output_file = results_folder / f"visualization_{recording_name}.json"
 
         print(f"Visualizing recording: {recording_name}")
 
         # retrieve sorter name
-        with open(data_processes_spikesorting_folder / f"spikesorting_{recording_name}.json", "r") as f:
+        data_process_spikesorting_json = spikesorted_folder / f"data_process_spikesorting_{recording_name}.json"
+        with open(data_process_spikesorting_json, "r") as f:
             data_process_spikesorting = json.load(f)
             sorter_name = data_process_spikesorting["parameters"]["sorter_name"]
 
-        with open(visualization_folder / f"{recording_name}.json", "r") as f:
+        with open(visualization_folder / f"preprocessedviz_{recording_name}.json", "r") as f:
             preprocessing_vizualization_data = json.load(f)
 
-        recording_processed = si.load_extractor(recording_folder)
+        recording_processed = si.load_extractor(preprocessed_folder)
 
         # drift
         cmap = plt.get_cmap(visualization_params["drift"]["cmap"])
@@ -185,15 +183,16 @@ if __name__ == "__main__":
             ax_drift.set_ylim(ylim)
             ax_drift.spines["top"].set_visible(False)
             ax_drift.spines["right"].set_visible(False)
-        fig_drift_folder = results_folder / "drift_maps"
+        fig_drift_folder = scratch_folder / "drift_maps"
         fig_drift_folder.mkdir(exist_ok=True)
         fig_drift.savefig(fig_drift_folder / f"{recording_name}_drift.png", dpi=300)
 
-        # make a sorting view View
-        v_drift = vv.TabLayoutItem(
-            label=f"Drift map",
-            view=vv.Image(image_path=str(fig_drift_folder / f"{recording_name}_drift.png"))
-        )
+        if not skip_timeseries:
+            # make a sorting view View
+            v_drift = vv.TabLayoutItem(
+                label=f"Drift map",
+                view=vv.Image(image_path=str(fig_drift_folder / f"{recording_name}_drift.png"))
+            )
 
         # timeseries
         if not visualization_params["timeseries"]["skip"]:
@@ -242,35 +241,39 @@ if __name__ == "__main__":
                     t_starts = np.linspace(0, segment_duration, n_snippets_per_seg + 2)[1:-1]
                     for t_start in t_starts:
                         time_range = np.round(np.array([t_start, t_start + visualization_params["timeseries"]["snippet_duration_s"]]), 1)
-                        w_full = sw.plot_timeseries(recording_full_loaded, order_channel_by_depth=True, time_range=time_range, 
-                                                    segment_index=segment_index, clim=clims_full, backend="sortingview", generate_url=False)
-                        if recording_proc_dict is not None:
-                            w_proc = sw.plot_timeseries(recording_proc_loaded, order_channel_by_depth=True, time_range=time_range, 
-                                                        segment_index=segment_index, clim=clims_proc, backend="sortingview", generate_url=False)
-                            view = vv.Splitter(
-                                        direction='horizontal',
-                                        item1=vv.LayoutItem(w_full.view),
-                                        item2=vv.LayoutItem(w_proc.view)
-                                    )
-                        else:
-                            view = w_full.view
-                        v_item = vv.TabLayoutItem(
-                            label=f"Timeseries - Segment {segment_index} - Time: {time_range}",
-                            view=view
-                        )
-                        timeseries_tab_items.append(v_item)
-                # add drift map
-                timeseries_tab_items.append(v_drift)
+                        if not skip_timeseries:
+                            w_full = sw.plot_timeseries(recording_full_loaded, order_channel_by_depth=True, time_range=time_range, 
+                                                        segment_index=segment_index, clim=clims_full, backend="sortingview", generate_url=False)
+                            if recording_proc_dict is not None:
+                                w_proc = sw.plot_timeseries(recording_proc_loaded, order_channel_by_depth=True, time_range=time_range, 
+                                                            segment_index=segment_index, clim=clims_proc, backend="sortingview", generate_url=False)
+                                view = vv.Splitter(
+                                            direction='horizontal',
+                                            item1=vv.LayoutItem(w_full.view),
+                                            item2=vv.LayoutItem(w_proc.view)
+                                        )
+                            else:
+                                view = w_full.view
+                            v_item = vv.TabLayoutItem(
+                                label=f"Timeseries - Segment {segment_index} - Time: {time_range}",
+                                view=view
+                            )
+                            timeseries_tab_items.append(v_item)
+                if not skip_timeseries:
+                    # add drift map
+                    timeseries_tab_items.append(v_drift)
 
-                v_timeseries = vv.TabLayout(
-                    items=timeseries_tab_items
-                )
-                try:
-                    url = v_timeseries.url(label=f"{session_name} - {recording_name}")
-                    print(f"\n{url}\n")
-                    visualization_output["timeseries"] = url
-                except Exception as e:
-                    print("KCL error", e)
+                    v_timeseries = vv.TabLayout(
+                        items=timeseries_tab_items
+                    )
+                    try:
+                        url = v_timeseries.url(label=f"{session_name} - {recording_name}")
+                        print(f"\n{url}\n")
+                        visualization_output["timeseries"] = url
+                    except Exception as e:
+                        print("KCL error", e)
+                else:
+                    print(f"\tSkipping timeseries for testing")
             except Exception as e:
                 print(f"Something wrong when visualizing timeseries: {e}")
 
@@ -278,7 +281,7 @@ if __name__ == "__main__":
         print(f"\tVisualizing sorting summary")        
         we = si.load_waveforms(waveforms_folder, with_recording=False)
         we._recording = recording_processed
-        sorting_precurated = si.load_extractor(sorting_precurated_folder / recording_name)
+        sorting_precurated = si.load_extractor(curation_folder / f"curated_{recording_name}")
         # set waveform_extractor sorting object to have pass_qc property
         we.sorting = sorting_precurated
 
@@ -322,8 +325,6 @@ if __name__ == "__main__":
         visualization_notes = visualization_notes.replace('\\"', "%22")
         visualization_notes = visualization_notes.replace('#', "%23")
 
-        # save vizualization output
-        visualization_output_file = visualization_output_folder / f"{recording_name}.json"
         # remove escape characters
         visualization_output_file.write_text(visualization_notes)
 
