@@ -99,13 +99,14 @@ if __name__ == "__main__":
 
 
     # loop through block-streams
-    for preprocessed_folder in preprocessed_folders:
+    for curated_folder in curated_folders:
         t_visualization_start = time.perf_counter()
         datetime_start_visualization = datetime.now()
         visualization_output = {}
     
-        recording_name = ("_").join(preprocessed_folder.name.split("_")[1:])
+        recording_name = ("_").join(curated_folder.name.split("_")[1:])
         waveforms_folder = postprocessed_folder / f"postprocessed_{recording_name}"
+        recording_folder = preprocessed_folder / f"preprocessed_{recording_name}"
         visualization_output_process_json = results_folder / f"{data_process_prefix}_{recording_name}.json"
         # save vizualization output
         visualization_output_file = results_folder / f"visualization_{recording_name}.json"
@@ -121,7 +122,7 @@ if __name__ == "__main__":
         with open(visualization_folder / f"preprocessedviz_{recording_name}.json", "r") as f:
             preprocessing_vizualization_data = json.load(f)
 
-        recording_processed = si.load_extractor(preprocessed_folder)
+        recording_processed = si.load_extractor(recording_folder)
 
         # drift
         cmap = plt.get_cmap(visualization_params["drift"]["cmap"])
