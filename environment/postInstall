@@ -2,8 +2,4 @@
 set -e
 
 # install spikeinterface
-git clone https://github.com/SpikeInterface/spikeinterface.git
-cd spikeinterface
-git checkout 4fb703d2caa23a8bc38706c29a845ea12d63538f
-pip install --no-cache-dir --ignore-installed .[full,widgets]
-cd ..
+pip install --no-cache-dir --ignore-installed spikeinterface[full,widgets]==0.98.0
