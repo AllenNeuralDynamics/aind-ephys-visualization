@@ -2,4 +2,4 @@
 set -e
 
 # install spikeinterface
-pip install --no-cache-dir --ignore-installed spikeinterface[full,widgets]==0.98.0
+pip install --no-cache-dir --ignore-installed spikeinterface[full,widgets]==0.98.1

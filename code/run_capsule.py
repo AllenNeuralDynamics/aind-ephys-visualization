@@ -15,6 +15,7 @@ from datetime import datetime, timedelta
 
 # SPIKEINTERFACE
 import spikeinterface as si
+import spikeinterface.preprocessing as spre
 import spikeinterface.qualitymetrics as sqm
 import spikeinterface.widgets as sw
 from spikeinterface.core.core_tools import check_json
@@ -45,7 +46,8 @@ visualization_params = dict(
     drift=dict(detection=dict(method='locally_exclusive', peak_sign='neg', detect_threshold=5, exclude_sweep_ms=0.1), 
                localization=dict(ms_before=0.1, ms_after=0.3, local_radius_um=100.),
                n_skip=30, alpha=0.15, vmin=-200, vmax=0, cmap="Greys_r",
-               figsize=(10, 10))
+               figsize=(10, 10)),
+    motion=dict(cmap="Greys_r", scatter_decimate=15, figsize=(15, 10))
 )
 
 job_kwargs = {
@@ -107,6 +109,7 @@ if __name__ == "__main__":
         recording_name = ("_").join(curated_folder.name.split("_")[1:])
         waveforms_folder = postprocessed_folder / f"postprocessed_{recording_name}"
         recording_folder = preprocessed_folder / f"preprocessed_{recording_name}"
+        motion_folder = preprocessed_folder / f"motion_{recording_name}"
         visualization_output_process_json = results_folder / f"{data_process_prefix}_{recording_name}.json"
         # save vizualization output
         visualization_output_file = results_folder / f"visualization_{recording_name}.json"
@@ -140,7 +143,6 @@ if __name__ == "__main__":
             peak_amps = np.concatenate(we.load_extension("spike_amplitudes").get_data())
         # otherwise etect peaks
         else:
-
             print(f"\tVisualizing drift maps using detected peaks (no spike sorting available)")
             # locally_exclusive + pipeline steps LocalizeCenterOfMass + PeakToPeakFeature
             drift_data = preprocessing_vizualization_data[recording_name]["drift"]
@@ -194,6 +196,29 @@ if __name__ == "__main__":
                 label=f"Drift map",
                 view=vv.Image(image_path=str(fig_drift_folder / f"{recording_name}_drift.png"))
             )
+
+        # plot motion
+        v_motion = None
+        if motion_folder.is_dir():
+            print("\tVisualizing motion")
+            motion_info = spre.load_motion_info(motion_folder)
+
+            cmap = visualization_params["motion"]["cmap"]
+            scatter_decimate = visualization_params["motion"]["scatter_decimate"]
+            figsize = visualization_params["motion"]["figsize"]
+
+            fig_motion = plt.figure(figsize=figsize)
+            w_motion = sw.plot_motion(motion_info, recording=recording, figure=fig_motion,
+                                      color_amplitude=True, amplitude_cmap=cmap,
+                                      scatter_decimate=scatter_decimate)
+            fig_motion.savefig(fig_drift_folder / f"{recording_name}_motion.png", dpi=300)
+
+            if not skip_timeseries:
+                # make a sorting view View
+                v_motion = vv.TabLayoutItem(
+                    label=f"Motion",
+                    view=vv.Image(image_path=str(fig_drift_folder / f"{recording_name}_motion.png"))
+                )
 
         # timeseries
         if not visualization_params["timeseries"]["skip"]:
@@ -263,6 +288,10 @@ if __name__ == "__main__":
                 if not skip_timeseries:
                     # add drift map
                     timeseries_tab_items.append(v_drift)
+
+                    # add motion if available
+                    if v_motion is not None:
+                        timeseries_tab_items.append(v_motion)
 
                     v_timeseries = vv.TabLayout(
                         items=timeseries_tab_items
