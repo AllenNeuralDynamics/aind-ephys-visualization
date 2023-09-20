@@ -7,9 +7,7 @@ os.environ['OPENBLAS_NUM_THREADS'] = '1'
 
 import numpy as np
 from pathlib import Path
-import shutil
 import json
-import sys
 import time
 from datetime import datetime, timedelta
 
@@ -25,7 +23,6 @@ from spikeinterface.sortingcomponents.peak_detection import detect_peaks
 from spikeinterface.sortingcomponents.peak_localization import LocalizeCenterOfMass
 
 # VIZ
-import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib.colors import Normalize
 import sortingview.views as vv
