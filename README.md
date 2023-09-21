@@ -19,10 +19,10 @@ Two types of visualizations are produced:
 The `data/` folder must include:
 
 - the original session data (e.g., "ecephys_664438_2023-04-12_14-59-51")
-- the output of the [aind-capsule-ephys-preprocessing](https://github.com/AllenNeuralDynamics/aind-capsule-ephys-preprocessing) capsule
-- the output of the spike sorting capsule (either with [aind-capsule-ephys-spikesort-pykilosort](https://github.com/AllenNeuralDynamics/aind-capsule-ephys-spikesort-pykilosort) or [aind-capsule-ephys-spikesort-kilosort25](https://github.com/AllenNeuralDynamics/aind-capsule-ephys-spikesort-kilosort25))
-- the output of the [aind-capsule-ephys-postprocessing](https://github.com/AllenNeuralDynamics/aind-capsule-ephys-postprocessing) capsule
-- the output of the [aind-capsule-ephys-curation](https://github.com/AllenNeuralDynamics/aind-capsule-ephys-curation) capsule
+- the output of the [aind-ephys-preprocessing](https://github.com/AllenNeuralDynamics/aind-capsule-ephys-preprocessing) capsule
+- the output of the spike sorting capsule (either with [aind-ephys-spikesort-pykilosort](https://github.com/AllenNeuralDynamics/aind-ephys-spikesort-pykilosort) or [aind-ephys-spikesort-kilosort25](https://github.com/AllenNeuralDynamics/aind-ephys-spikesort-kilosort25))
+- the output of the [aind-capsule-ephys-postprocessing](https://github.com/AllenNeuralDynamics/aind-ephys-postprocessing) capsule
+- the output of the [aind-capsule-ephys-curation](https://github.com/AllenNeuralDynamics/aind-ephys-curation) capsule
 
 ### Parameters
 
