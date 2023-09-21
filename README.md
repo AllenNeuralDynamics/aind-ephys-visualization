@@ -1,5 +1,5 @@
 # Visualization for AIND ephys pipeline
-## aind-capsule-ephys-visualization
+## aind-ephys-visualization
 
 
 ### Description
