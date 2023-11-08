@@ -15,9 +15,9 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 RUN pip install -U --no-cache-dir \
-    aind-data-schema==0.13.66 \
+    aind-data-schema==0.15.25 \
     pyvips==2.2.1 \
-    wavpack-numcodecs==0.1.4
+    wavpack-numcodecs==0.1.5
 
 COPY postInstall /
 RUN /postInstall
