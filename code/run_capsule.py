@@ -362,7 +362,7 @@ if __name__ == "__main__":
         visualization_params["recording_name"] = recording_name
         visualization_process = DataProcess(
             name="Ephys visualization",
-            version=VERSION, # either release or git commit
+            software_version=VERSION, # either release or git commit
             start_date_time=datetime_start_visualization,
             end_date_time=datetime_start_visualization + timedelta(seconds=np.floor(elapsed_time_visualization)),
             input_location=str(data_folder),
