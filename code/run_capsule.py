@@ -93,6 +93,7 @@ if __name__ == "__main__":
 
     preprocessed_json_files = [p for p in preprocessed_folder.iterdir() if p.name.endswith(".json") and "preprocessedviz_" in p.name]
 
+    print(f"Found {len(preprocessed_json_files)} preprocessed JSON files")
 
     # loop through block-streams
     # TODO: make sure unprocessed recordings (e.g. short ones) still visualize timeseries
