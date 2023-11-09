@@ -16,6 +16,10 @@ import spikeinterface as si
 import spikeinterface.preprocessing as spre
 import spikeinterface.widgets as sw
 
+# needed to load extensions
+import spikeinterface.postprocessing as spost
+import spikeinterface.qualitymetrics as sqm
+
 # VIZ
 import matplotlib.pyplot as plt
 from matplotlib.colors import Normalize
