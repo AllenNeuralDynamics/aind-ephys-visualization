@@ -14,13 +14,7 @@ from datetime import datetime, timedelta
 # SPIKEINTERFACE
 import spikeinterface as si
 import spikeinterface.preprocessing as spre
-import spikeinterface.qualitymetrics as sqm
 import spikeinterface.widgets as sw
-from spikeinterface.core.core_tools import check_json
-
-from spikeinterface.sortingcomponents.peak_pipeline import ExtractDenseWaveforms
-from spikeinterface.sortingcomponents.peak_detection import detect_peaks
-from spikeinterface.sortingcomponents.peak_localization import LocalizeCenterOfMass
 
 # VIZ
 import matplotlib.pyplot as plt
@@ -28,7 +22,6 @@ from matplotlib.colors import Normalize
 import sortingview.views as vv
 
 # AIND
-from aind_data_schema import Processing
 from aind_data_schema.processing import DataProcess
 
 
@@ -73,14 +66,12 @@ if __name__ == "__main__":
         print("\n*******************\n**** TEST MODE ****\n*******************\n")
         postprocessed_folder = data_folder / "postprocessing_pipeline_output_test"
         preprocessed_folder = data_folder / "preprocessing_pipeline_output_test"
-        visualization_folder = data_folder / "preprocessing_pipeline_output_test"
         curation_folder = data_folder / "curation_pipeline_output_test"
         spikesorted_folder = data_folder / "spikesorting_pipeline_output_test"
         skip_timeseries = False
     else:
         postprocessed_folder = data_folder
         preprocessed_folder = data_folder
-        visualization_folder = data_folder
         curation_folder = data_folder
         spikesorted_folder = data_folder
         data_processes_spikesorting_folder =  data_folder
@@ -96,16 +87,20 @@ if __name__ == "__main__":
     postprocessed_folders = [p for p in postprocessed_folder.iterdir() if p.is_dir() and "postprocessed_" in p.name and "-sorting" not in p.name]
     curated_folders = [p for p in curation_folder.iterdir() if p.is_dir() and  "curated_" in p.name]
 
+    preprocessed_json_files = [p for p in preprocessed_folder.iterdir() if p.name.endswith(".json") and "preprocessedviz_" in p.name]
+
 
     # loop through block-streams
-    for curated_folder in curated_folders:
+    # TODO: make sure unprocessed recordings (e.g. short ones) still visualize timeseries
+    for preprocessed_json_file in preprocessed_json_files:
+        recording_name = preprocessed_json_file.stem.replace("preprocessedviz_", "")
         t_visualization_start = time.perf_counter()
         datetime_start_visualization = datetime.now()
         visualization_output = {}
     
-        recording_name = ("_").join(curated_folder.name.split("_")[1:])
         waveforms_folder = postprocessed_folder / f"postprocessed_{recording_name}"
         recording_folder = preprocessed_folder / f"preprocessed_{recording_name}"
+        curated_folder = curation_folder / f"curated_{recording_name}"
         motion_folder = preprocessed_folder / f"motion_{recording_name}"
         visualization_output_process_json = results_folder / f"{data_process_prefix}_{recording_name}.json"
         # save vizualization output
@@ -113,16 +108,8 @@ if __name__ == "__main__":
 
         print(f"Visualizing recording: {recording_name}")
 
-        # retrieve sorter name
-        data_process_spikesorting_json = spikesorted_folder / f"data_process_spikesorting_{recording_name}.json"
-        with open(data_process_spikesorting_json, "r") as f:
-            data_process_spikesorting = json.load(f)
-            sorter_name = data_process_spikesorting["parameters"]["sorter_name"]
-
-        with open(visualization_folder / f"preprocessedviz_{recording_name}.json", "r") as f:
+        with open(preprocessed_json_file, "r") as f:
             preprocessing_vizualization_data = json.load(f)
-
-        recording_processed = si.load_extractor(recording_folder)
 
         # drift
         cmap = plt.get_cmap(visualization_params["drift"]["cmap"])
@@ -134,27 +121,40 @@ if __name__ == "__main__":
         if waveforms_folder.is_dir():
             print(f"\tVisualizing drift maps using spike sorted data")
             we = si.load_waveforms(waveforms_folder, with_recording=False)
-            recording = recording_processed
+            # here recording_fodler MUST exist
+            assert recording_folder.is_dir(), f"Recording folder {recording_folder} does not exist"
+            recording = si.load_extractor(recording_folder)
             peaks = we.sorting.to_spike_vector()
             peak_locations = we.load_extension("spike_locations").get_data()
             peak_amps = np.concatenate(we.load_extension("spike_amplitudes").get_data())
-        # otherwise etect peaks
+        # otherwise detect peaks
         else:
+            from spikeinterface.core.node_pipeline import ExtractSparseWaveforms, run_node_pipeline
+            from spikeinterface.sortingcomponents.peak_detection import DetectPeakLocallyExclusive
+            from spikeinterface.sortingcomponents.peak_localization import LocalizeCenterOfMass
+
             print(f"\tVisualizing drift maps using detected peaks (no spike sorting available)")
             # locally_exclusive + pipeline steps LocalizeCenterOfMass + PeakToPeakFeature
             drift_data = preprocessing_vizualization_data[recording_name]["drift"]
             recording = si.load_extractor(drift_data["recording"], base_folder=data_folder)
-            extract_dense_waveforms = ExtractDenseWaveforms(recording, ms_before=visualization_params["drift"]["localization"]["ms_before"],
-                                                            ms_after=visualization_params["drift"]["localization"]["ms_after"], return_output=False)
-            localize_peaks = LocalizeCenterOfMass(recording, local_radius_um=visualization_params["drift"]["localization"]["local_radius_um"], 
-                                                  parents=[extract_dense_waveforms])
-            pipeline_nodes = [
-                extract_dense_waveforms,
-                localize_peaks
-            ]
-            peaks, peak_locations = detect_peaks(recording,
-                                                 pipeline_nodes=pipeline_nodes,
-                                                 **visualization_params["drift"]["detection"])
+
+            # Here we use the node pipeline implementation
+            peak_detector_node = DetectPeakLocallyExclusive(recording, **visualization_params["drift"]["detection"])
+            extract_sparse_waveforms_node = ExtractSparseWaveforms(
+                recording,
+                ms_before=visualization_params["drift"]["localization"]["ms_before"],
+                ms_after=visualization_params["drift"]["localization"]["ms_after"],
+                radius_um=visualization_params["drift"]["localization"]["radius_um"],
+                parents=[peak_detector_node],
+                return_output=False,
+            )
+            localize_peaks_node = LocalizeCenterOfMass(
+                recording,
+                radius_um=visualization_params["drift"]["localization"]["radius_um"],
+                parents=[extract_sparse_waveforms_node],
+            )
+            pipeline_nodes = [peak_detector_node, extract_sparse_waveforms_node, localize_peaks_node]
+            peaks, peak_locations = run_node_pipeline(recording, pipeline_nodes=pipeline_nodes)
             print(f"\tDetected {len(peaks)} peaks")
             peak_amps = peaks["amplitude"]
 
@@ -305,46 +305,57 @@ if __name__ == "__main__":
                 print(f"Something wrong when visualizing timeseries: {e}")
 
         # sorting summary        
-        print(f"\tVisualizing sorting summary")        
-        we = si.load_waveforms(waveforms_folder, with_recording=False)
-        we._recording = recording_processed
-        sorting_precurated = si.load_extractor(curation_folder / f"curated_{recording_name}")
-        # set waveform_extractor sorting object to have pass_qc property
-        we.sorting = sorting_precurated
+        print(f"\tVisualizing sorting summary")
+        if waveforms_folder.is_dir() and curated_folder.is_dir():
+            we = si.load_waveforms(waveforms_folder, with_recording=False)
+            we._recording = si.load_extractor(recording_folder)
+            sorting_precurated = si.load_extractor(curated_folder)
+            # set waveform_extractor sorting object to have pass_qc property
+            we.sorting = sorting_precurated
 
-        
-        if len(we.sorting.unit_ids) > 0:
-            # tab layout with Summary and Quality Metrics
-            v_qm = sw.plot_quality_metrics(we, skip_metrics=['isi_violations_count', 'rp_violations'], 
-                                           include_metrics_data=True, backend="sortingview", generate_url=False).view
-            v_sorting = sw.plot_sorting_summary(we, unit_table_properties=["default_qc"], curation=True, 
-                                                backend="sortingview", generate_url=False).view
+            # retrieve sorter name (if spike sorting was performed)
+            data_process_spikesorting_json = spikesorted_folder / f"data_process_spikesorting_{recording_name}.json"
+            if data_process_spikesorting_json.is_file():
+                with open(data_process_spikesorting_json, "r") as f:
+                    data_process_spikesorting = json.load(f)
+                    sorter_name = data_process_spikesorting["parameters"]["sorter_name"]
+            else:
+                sorter_name = "unknown"
 
-            v_summary = vv.TabLayout(
-                    items=[
-                        vv.TabLayoutItem(
-                            label='Sorting summary',
-                            view=v_sorting
-                        ),
-                        vv.TabLayoutItem(
-                            label='Quality Metrics',
-                            view=v_qm
-                        )
-                    ]
-                )
+            if len(we.sorting.unit_ids) > 0:
+                # tab layout with Summary and Quality Metrics
+                v_qm = sw.plot_quality_metrics(we, skip_metrics=['isi_violations_count', 'rp_violations'],
+                                            include_metrics_data=True, backend="sortingview", generate_url=False).view
+                v_sorting = sw.plot_sorting_summary(we, unit_table_properties=["default_qc"], curation=True,
+                                                    backend="sortingview", generate_url=False).view
 
-            try:
-                # pre-generate gh for curation
-                gh_path = f"{GH_CURATION_REPO}/{session_name}/{recording_name}/{sorter_name}/curation.json"
-                state = dict(sortingCuration=gh_path)
-                url = v_summary.url(label=f"{session_name} - {recording_name} - {sorter_name} - Sorting Summary", state=state)
-                print(f"\n{url}\n")
-                visualization_output["sorting_summary"] = url
+                v_summary = vv.TabLayout(
+                        items=[
+                            vv.TabLayoutItem(
+                                label='Sorting summary',
+                                view=v_sorting
+                            ),
+                            vv.TabLayoutItem(
+                                label='Quality Metrics',
+                                view=v_qm
+                            )
+                        ]
+                    )
 
-            except Exception as e:
-                print("KCL error", e)
+                try:
+                    # pre-generate gh for curation
+                    gh_path = f"{GH_CURATION_REPO}/{session_name}/{recording_name}/{sorter_name}/curation.json"
+                    state = dict(sortingCuration=gh_path)
+                    url = v_summary.url(label=f"{session_name} - {recording_name} - {sorter_name} - Sorting Summary", state=state)
+                    print(f"\n{url}\n")
+                    visualization_output["sorting_summary"] = url
+
+                except Exception as e:
+                    print("KCL error", e)
+            else:
+                print("No units after curation!")
         else:
-            print("No units after curation!")
+            print(f"\tSkipping sorting summary visualization for {recording_name}. No sorting information available")
 
         # save params in output
         visualization_notes = json.dumps(visualization_output, indent=4)
