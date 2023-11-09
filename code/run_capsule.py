@@ -91,20 +91,16 @@ if __name__ == "__main__":
     postprocessed_folders = [p for p in postprocessed_folder.iterdir() if p.is_dir() and "postprocessed_" in p.name and "-sorting" not in p.name]
     curated_folders = [p for p in curation_folder.iterdir() if p.is_dir() and  "curated_" in p.name]
 
-    preprocessed_json_files = [p for p in preprocessed_folder.iterdir() if p.name.endswith(".json") and "preprocessedviz_" in p.name]
-
-    print(f"Found {len(preprocessed_json_files)} preprocessed JSON files")
-
     # loop through block-streams
-    # TODO: make sure unprocessed recordings (e.g. short ones) still visualize timeseries
-    for preprocessed_json_file in preprocessed_json_files:
-        recording_name = preprocessed_json_file.stem.replace("preprocessedviz_", "")
+    for curated_folder in curated_folders:
         t_visualization_start = time.perf_counter()
         datetime_start_visualization = datetime.now()
         visualization_output = {}
-    
+
+        recording_name = ("_").join(curated_folder.name.split("_")[1:])
         waveforms_folder = postprocessed_folder / f"postprocessed_{recording_name}"
         recording_folder = preprocessed_folder / f"preprocessed_{recording_name}"
+        preprocessed_json_file = preprocessed_folder / f"preprocessedviz_{recording_name}.json"
         curated_folder = curation_folder / f"curated_{recording_name}"
         motion_folder = preprocessed_folder / f"motion_{recording_name}"
         visualization_output_process_json = results_folder / f"{data_process_prefix}_{recording_name}.json"
