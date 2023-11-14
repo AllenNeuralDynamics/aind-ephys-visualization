@@ -1,4 +1,4 @@
-# hash:sha256:1674e76e80cf466a83a1985989a571bae03dc7d7d01a2b9aaa8d1fee9b5b401f
+# hash:sha256:ba83b65c116fd8a9316e2359c52c4575ee5bae26f5c102dba553a55b045b136d
 FROM registry.codeocean.allenneuraldynamics.org/codeocean/jupyterlab:3.6.1-miniconda4.12.0-python3.9-ubuntu20.04
 
 ARG DEBIAN_FRONTEND=noninteractive
@@ -17,5 +17,5 @@ RUN apt-get update \
 RUN pip install -U --no-cache-dir \
     aind-data-schema==0.17.1 \
     pyvips==2.2.1 \
-    spikeinterface[full,widgets]==0.99.0 \
+    spikeinterface[full,widgets]==0.99.1 \
     wavpack-numcodecs==0.1.5
