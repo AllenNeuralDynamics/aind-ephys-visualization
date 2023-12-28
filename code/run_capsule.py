@@ -24,7 +24,7 @@ from matplotlib.colors import Normalize
 import sortingview.views as vv
 
 # AIND
-from aind_data_schema.processing import DataProcess
+from aind_data_schema.core.processing import DataProcess
 
 
 URL = "https://github.com/AllenNeuralDynamics/aind-capsule-ephys-visualization"
@@ -422,7 +422,7 @@ if __name__ == "__main__":
             notes=visualization_notes,
         )
         with open(visualization_output_process_json, "w") as f:
-            f.write(visualization_process.json(indent=3))
+            f.write(visualization_process.model_dump_json(indent=3))
 
     # save vizualization output
     t_visualization_end_all = time.perf_counter()
