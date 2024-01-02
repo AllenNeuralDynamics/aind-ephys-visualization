@@ -83,8 +83,19 @@ if __name__ == "__main__":
 
     ecephys_sessions = [p for p in data_folder.iterdir() if "ecephys" in p.name.lower()]
     assert len(ecephys_sessions) == 1, f"Attach one session at a time {ecephys_sessions}"
-    session = ecephys_sessions[0]
-    session_name = session.name
+    session_folder = ecephys_sessions[0]
+
+    # in pipeline the ephys folder is renames 'ecephys_session'
+    # in this case, grab session name from data_description (if it exists)
+    data_description_file = session_folder / "data_description.json"
+    if data_description_file.is_file():
+        with open(data_description_file, "r") as f:
+            data_description_dict = json.load(f)
+        session_name = data_description_dict["name"]
+    else:
+        session_name = session_folder.name
+
+    print(f"Session name: {session_name}")
 
     preprocessed_folders = [p for p in preprocessed_folder.iterdir() if p.is_dir() and "preprocessed_" in p.name]
     spikesorted_folders = [p for p in spikesorted_folder.iterdir() if p.is_dir() and "spikesorted_" in p.name]
