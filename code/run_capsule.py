@@ -97,7 +97,7 @@ if __name__ == "__main__":
 
     print(f"Session name: {session_name}")
 
-    preprocessed_folders = [p for p in preprocessed_folder.iterdir() if p.is_dir() and "preprocessed_" in p.name]
+    preprocessed_folders = [p for p in preprocessed_folder.iterdir() if p.is_dir() and "preprocessed_" in p.name and p.is_dir()]
     spikesorted_folders = [p for p in spikesorted_folder.iterdir() if p.is_dir() and "spikesorted_" in p.name]
     postprocessed_folders = [
         p
@@ -107,12 +107,12 @@ if __name__ == "__main__":
     curated_folders = [p for p in curation_folder.iterdir() if p.is_dir() and "curated_" in p.name]
 
     # loop through block-streams
-    for curated_folder in curated_folders:
+    for stream_folder in preprocessed_folders:
         t_visualization_start = time.perf_counter()
         datetime_start_visualization = datetime.now()
         visualization_output = {}
 
-        recording_name = ("_").join(curated_folder.name.split("_")[1:])
+        recording_name = ("_").join(stream_folder.name.split("_")[1:])
         waveforms_folder = postprocessed_folder / f"postprocessed_{recording_name}"
         recording_folder = preprocessed_folder / f"preprocessed_{recording_name}"
         preprocessed_json_file = preprocessed_folder / f"preprocessedviz_{recording_name}.json"
