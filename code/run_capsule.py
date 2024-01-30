@@ -4,6 +4,7 @@ warnings.filterwarnings("ignore")
 
 # GENERAL IMPORTS
 import argparse
+import os
 import numpy as np
 from pathlib import Path
 import json
@@ -34,7 +35,7 @@ VERSION = "0.1.0"
 GH_CURATION_REPO = "gh://AllenNeuralDynamics/ephys-sorting-manual-curation/main"
 
 data_folder = Path("../data/")
-scratc_folder = Path("../scratch")
+scratch_folder = Path("../scratch")
 results_folder = Path("../results/")
 
 # Define argument parser
