@@ -21,7 +21,7 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 RUN pip install -U --no-cache-dir \
-    aind-data-schema==0.22.1 \
+    aind-data-schema==0.19.1 \
     pyvips==2.2.1 \
     spikeinterface[full,widgets]==0.99.1 \
     wavpack-numcodecs==0.1.5
