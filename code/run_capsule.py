@@ -124,26 +124,10 @@ if __name__ == "__main__":
 
     print(f"Session name: {session_name}")
 
-    preprocessed_folders = [
-        p for p in preprocessed_folder.iterdir() if p.is_dir() and "preprocessed_" in p.name and p.is_dir()
+    # Retrieve recording_names from preprocessed folder
+    recording_names = [
+        "_".join(p.name.split("_")[1:]) for p in preprocessed_folder.iterdir() if p.is_dir() and "preprocessed_" in p.name
     ]
-
-    # load job json files
-    job_config_json_files = [p for p in data_folder.iterdir() if p.suffix == ".json" and "job" in p.name]
-    print(f"Found {len(job_config_json_files)} json configurations")
-
-    if len(job_config_json_files) > 0:
-        recording_names = []
-        for json_file in job_config_json_files:
-            with open(json_file, "r") as f:
-                config = json.load(f)
-            recording_name = config["recording_name"]
-            assert (
-                preprocessed_folder / f"preprocessed_{recording_name}"
-            ).is_dir(), f"Preprocessed folder for {recording_name} not found!"
-            recording_names.append(recording_name)
-    else:
-        recording_names = [("_").join(p.name.split("_")[1:]) for p in preprocessed_folders]
 
     # loop through block-streams
     for recording_name in recording_names:
@@ -151,8 +135,8 @@ if __name__ == "__main__":
         datetime_start_visualization = datetime.now()
         visualization_output = {}
 
-        waveforms_folder = postprocessed_folder / f"postprocessed_{recording_name}"
         recording_folder = preprocessed_folder / f"preprocessed_{recording_name}"
+        waveforms_folder = postprocessed_folder / f"postprocessed_{recording_name}"
         preprocessed_json_file = preprocessed_folder / f"preprocessedviz_{recording_name}.json"
         curated_folder = curation_folder / f"curated_{recording_name}"
         motion_folder = preprocessed_folder / f"motion_{recording_name}"
