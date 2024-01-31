@@ -130,6 +130,7 @@ if __name__ == "__main__":
         for p in preprocessed_folder.iterdir()
         if p.is_dir() and "preprocessed_" in p.name
     ]
+    print(recording_names)
 
     # loop through block-streams
     for recording_name in recording_names:
@@ -181,7 +182,7 @@ if __name__ == "__main__":
             # locally_exclusive + pipeline steps LocalizeCenterOfMass + PeakToPeakFeature
             drift_data = preprocessing_vizualization_data[recording_name]["drift"]
             try:
-                recording = si.load_extractor(drift_data["recording"], base_folder=data_folder)
+                recording = si.load_extractor(drift_data["recording"], base_folder=preprocessed_folder)
 
                 # Here we use the node pipeline implementation
                 peak_detector_node = DetectPeakLocallyExclusive(recording, **visualization_params["drift"]["detection"])
@@ -203,8 +204,8 @@ if __name__ == "__main__":
                 )
                 print(f"\tDetected {len(peaks)} peaks")
                 peak_amps = peaks["amplitude"]
-            except:
-                print(f"\t\tCould not load drift recording. Skipping")
+            except Exception as e:
+                print(f"\t\tCould not load drift recording. Error:\n{e}\nSkipping")
                 skip_drift = True
 
         if not skip_drift:
@@ -291,7 +292,7 @@ if __name__ == "__main__":
                 try:
                     rec = si.load_extractor(rec_dict, base_folder=data_folder)
                 except:
-                    print(f"\t\tCould not load layer {layer}. Skipping")
+                    print(f"\t\tCould not load layer {layer}. Error:\n{e}\nSkipping")
                     continue
                 chunk = si.get_random_data_chunks(rec)
                 max_value = np.quantile(chunk, 0.99) * 1.2
