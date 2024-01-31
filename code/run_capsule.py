@@ -290,6 +290,7 @@ if __name__ == "__main__":
                     rec = si.load_extractor(rec_dict, base_folder=data_folder)
                 except:
                     print(f"\t\tCould not load layer {layer}. Skipping")
+                    raise Exception
                     continue
                 chunk = si.get_random_data_chunks(rec)
                 max_value = np.quantile(chunk, 0.99) * 1.2

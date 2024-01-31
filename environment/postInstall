@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+set -e
+
+pip uninstall -y spikeinterface
+git clone https://github.com/SpikeInterface/spikeinterface.git
+cd spikeinterface
+git checkout 15d38999957b188ea6c9451fe125ea466c5cb56d
+pip install --ignore-installed --no-cache-dir .[full,widgets]
+cd ..

@@ -1,4 +1,4 @@
-# hash:sha256:7c9e7d64c876ce9aa1b35a5bc557f42f7fc28fa0bad8de6a9752d45b2bb10580
+# hash:sha256:826552710e067f144abc01382766a784ee7c5bba4ce7cec09d2d61499c14dd6d
 FROM registry.codeocean.allenneuraldynamics.org/codeocean/jupyterlab:3.6.1-miniconda4.12.0-python3.9-ubuntu20.04
 
 ARG DEBIAN_FRONTEND=noninteractive
@@ -25,3 +25,6 @@ RUN pip install -U --no-cache-dir \
     pyvips==2.2.1 \
     spikeinterface[full,widgets]==0.99.1 \
     wavpack-numcodecs==0.1.5
+
+COPY postInstall /
+RUN /postInstall
