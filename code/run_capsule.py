@@ -29,7 +29,7 @@ import sortingview.views as vv
 from aind_data_schema.core.processing import DataProcess
 
 
-URL = "https://github.com/AllenNeuralDynamics/aind-capsule-ephys-visualization"
+URL = "https://github.com/AllenNeuralDynamics/aind-ephys-visualization"
 VERSION = "0.1.0"
 
 GH_CURATION_REPO = "gh://AllenNeuralDynamics/ephys-sorting-manual-curation/main"
@@ -126,7 +126,9 @@ if __name__ == "__main__":
 
     # Retrieve recording_names from preprocessed folder
     recording_names = [
-        "_".join(p.name.split("_")[1:]) for p in preprocessed_folder.iterdir() if p.is_dir() and "preprocessed_" in p.name
+        "_".join(p.name.split("_")[1:])
+        for p in preprocessed_folder.iterdir()
+        if p.is_dir() and "preprocessed_" in p.name
     ]
 
     # loop through block-streams
