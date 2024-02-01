@@ -9,6 +9,7 @@ import numpy as np
 from pathlib import Path
 import json
 import time
+import pandas as pd
 from datetime import datetime, timedelta
 
 # SPIKEINTERFACE
@@ -33,6 +34,7 @@ URL = "https://github.com/AllenNeuralDynamics/aind-ephys-visualization"
 VERSION = "0.1.0"
 
 GH_CURATION_REPO = "gh://AllenNeuralDynamics/ephys-sorting-manual-curation/main"
+LABEL_CHOICES = ["noise", "MUA", "SUA", "pMUA", "pSUA"]
 
 data_folder = Path("../data/")
 scratch_folder = Path("../scratch")
@@ -98,12 +100,14 @@ if __name__ == "__main__":
         postprocessed_folder = data_folder / "postprocessing_pipeline_output_test"
         preprocessed_folder = data_folder / "preprocessing_pipeline_output_test"
         curation_folder = data_folder / "curation_pipeline_output_test"
+        unit_classifier_folder = data_folder / "unit_classifier_pipeline_output_test"
         spikesorted_folder = data_folder / "spikesorting_pipeline_output_test"
         skip_timeseries = False
     else:
         postprocessed_folder = data_folder
         preprocessed_folder = data_folder
         curation_folder = data_folder
+        unit_classifier_folder = data_folder
         spikesorted_folder = data_folder
         data_processes_spikesorting_folder = data_folder
         skip_timeseries = False
@@ -130,7 +134,6 @@ if __name__ == "__main__":
         for p in preprocessed_folder.iterdir()
         if p.is_dir() and "preprocessed_" in p.name
     ]
-    print(recording_names)
 
     # loop through block-streams
     for recording_name in recording_names:
@@ -141,7 +144,8 @@ if __name__ == "__main__":
         recording_folder = preprocessed_folder / f"preprocessed_{recording_name}"
         waveforms_folder = postprocessed_folder / f"postprocessed_{recording_name}"
         preprocessed_json_file = preprocessed_folder / f"preprocessedviz_{recording_name}.json"
-        curated_folder = curation_folder / f"curated_{recording_name}"
+        qc_file = curation_folder / f"qc_{recording_name}.npy"
+        unit_classifier_file = unit_classifier_folder / f"unit_classifier_{recording_name}.csv"
         motion_folder = preprocessed_folder / f"motion_{recording_name}"
         visualization_output_process_json = results_folder / f"{data_process_prefix}_{recording_name}.json"
         # save vizualization output
@@ -378,12 +382,40 @@ if __name__ == "__main__":
 
         # sorting summary
         print(f"\tVisualizing sorting summary")
-        if waveforms_folder.is_dir() and curated_folder.is_dir():
+        if waveforms_folder.is_dir():
             we = si.load_waveforms(waveforms_folder, with_recording=False)
-            we._recording = si.load_extractor(recording_folder)
-            sorting_precurated = si.load_extractor(curated_folder)
-            # set waveform_extractor sorting object to have pass_qc property
-            we.sorting = sorting_precurated
+            we.set_recording(si.load_extractor(recording_folder))
+
+            unit_table_properties = []
+            # add firing rate and amplitude columns
+            if we.has_extension("quality_metrics"):
+                qm = we.load_extension("quality_metrics").get_data()
+                if "firing_rate" in qm.columns:
+                    firing_rates = np.round(qm["firing_rate"].values, 2)
+                    we.sorting.set_property("firing_rate", firing_rates)
+                    unit_table_properties.append("firing_rate")
+                if "amplitude_median" in qm.columns:
+                    unit_amplitudes = np.round(qm["amplitude_median"].values, 2)
+                    we.sorting.set_property("amplitude", unit_amplitudes)
+                    unit_table_properties.append("amplitude")
+
+            # add curation column
+            if qc_file.is_file():
+                # add qc property to we sorting
+                default_qc = np.load(qc_file)
+                we.sorting.set_property("default_qc", default_qc)
+                unit_table_properties.append("default_qc")
+
+            # add noise decoder column
+            if unit_classifier_file.is_file():
+                # add decoder_label and decoder probability
+                unit_classifier_df = pd.read_csv(unit_classifier_file, index_col=False)
+                decoder_label = unit_classifier_df["decoder_label"]
+                we.sorting.set_property("decoder_label", decoder_label)
+                unit_table_properties.append("decoder_label")
+                decoder_prob = np.round(unit_classifier_df["decoder_probability"], 2)
+                we.sorting.set_property("decoder_prob", decoder_prob)
+                unit_table_properties.append("decoder_prob")
 
             # retrieve sorter name (if spike sorting was performed)
             data_process_spikesorting_json = spikesorted_folder / f"data_process_spikesorting_{recording_name}.json"
@@ -404,7 +436,8 @@ if __name__ == "__main__":
                     generate_url=False,
                 ).view
                 v_sorting = sw.plot_sorting_summary(
-                    we, unit_table_properties=["default_qc"], curation=True, backend="sortingview", generate_url=False
+                    we, unit_table_properties=unit_table_properties, curation=True, 
+                    label_choices=LABEL_CHOICES, backend="sortingview", generate_url=False
                 ).view
 
                 v_summary = vv.TabLayout(
