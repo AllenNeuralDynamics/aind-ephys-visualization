@@ -3,10 +3,13 @@ import warnings
 warnings.filterwarnings("ignore")
 
 # GENERAL IMPORTS
+import argparse
+import os
 import numpy as np
 from pathlib import Path
 import json
 import time
+import pandas as pd
 from datetime import datetime, timedelta
 
 # SPIKEINTERFACE
@@ -27,38 +30,64 @@ import sortingview.views as vv
 from aind_data_schema.core.processing import DataProcess
 
 
-URL = "https://github.com/AllenNeuralDynamics/aind-capsule-ephys-visualization"
+URL = "https://github.com/AllenNeuralDynamics/aind-ephys-visualization"
 VERSION = "0.1.0"
 
 GH_CURATION_REPO = "gh://AllenNeuralDynamics/ephys-sorting-manual-curation/main"
-
-
-visualization_params = dict(
-    timeseries=dict(n_snippets_per_segment=2, snippet_duration_s=0.5, skip=False),
-    drift=dict(
-        detection=dict(peak_sign="neg", detect_threshold=5, exclude_sweep_ms=0.1),
-        localization=dict(ms_before=0.1, ms_after=0.3, adius_um=100.0),
-        n_skip=30,
-        alpha=0.15,
-        vmin=-200,
-        vmax=0,
-        cmap="Greys_r",
-        figsize=(10, 10),
-    ),
-    motion=dict(cmap="Greys_r", scatter_decimate=15, figsize=(15, 10)),
-)
-
-job_kwargs = {"n_jobs": -1, "chunk_duration": "1s", "progress_bar": True}
+LABEL_CHOICES = ["noise", "MUA", "SUA", "pMUA", "pSUA"]
 
 data_folder = Path("../data/")
 scratch_folder = Path("../scratch")
 results_folder = Path("../results/")
 
+# Define argument parser
+parser = argparse.ArgumentParser(description="Curate ecephys data")
+
+n_jobs_group = parser.add_mutually_exclusive_group()
+n_jobs_help = "Duration of clipped recording in debug mode. Default is 30 seconds. Only used if debug is enabled"
+n_jobs_help = (
+    "Number of jobs to use for parallel processing. Default is -1 (all available cores). "
+    "It can also be a float between 0 and 1 to use a fraction of available cores"
+)
+n_jobs_group.add_argument("static_n_jobs", nargs="?", default="-1", help=n_jobs_help)
+n_jobs_group.add_argument("--n-jobs", default="-1", help=n_jobs_help)
+
+params_group = parser.add_mutually_exclusive_group()
+params_file_help = "Optional json file with parameters"
+params_group.add_argument("static_params_file", nargs="?", default=None, help=params_file_help)
+params_group.add_argument("--params-file", default=None, help=params_file_help)
+params_group.add_argument("--params-str", default=None, help="Optional json string with parameters")
+
 
 if __name__ == "__main__":
+    args = parser.parse_args()
+
+    N_JOBS = args.static_n_jobs or args.n_jobs
+    N_JOBS = int(N_JOBS) if not N_JOBS.startswith("0.") else float(N_JOBS)
+    PARAMS_FILE = args.static_params_file or args.params_file
+    PARAMS_STR = args.params_str
+
+    # Use CO_CPUS env variable if available
+    N_JOBS_CO = os.getenv("CO_CPUS")
+    N_JOBS = int(N_JOBS_CO) if N_JOBS_CO is not None else N_JOBS
+
+    if PARAMS_FILE is not None:
+        print(f"\nUsing custom parameter file: {PARAMS_FILE}")
+        with open(PARAMS_FILE, "r") as f:
+            processing_params = json.load(f)
+    elif PARAMS_STR is not None:
+        processing_params = json.loads(PARAMS_STR)
+    else:
+        with open("params.json", "r") as f:
+            processing_params = json.load(f)
+
     data_process_prefix = "data_process_visualization"
 
+    job_kwargs = processing_params["job_kwargs"]
+    job_kwargs["n_jobs"] = N_JOBS
     si.set_global_job_kwargs(**job_kwargs)
+
+    visualization_params = processing_params["visualization"]
 
     ###### VISUALIZATION #########
     print("\n\nVISUALIZATION")
@@ -71,12 +100,14 @@ if __name__ == "__main__":
         postprocessed_folder = data_folder / "postprocessing_pipeline_output_test"
         preprocessed_folder = data_folder / "preprocessing_pipeline_output_test"
         curation_folder = data_folder / "curation_pipeline_output_test"
+        unit_classifier_folder = data_folder / "unit_classifier_pipeline_output_test"
         spikesorted_folder = data_folder / "spikesorting_pipeline_output_test"
         skip_timeseries = False
     else:
         postprocessed_folder = data_folder
         preprocessed_folder = data_folder
         curation_folder = data_folder
+        unit_classifier_folder = data_folder
         spikesorted_folder = data_folder
         data_processes_spikesorting_folder = data_folder
         skip_timeseries = False
@@ -97,26 +128,24 @@ if __name__ == "__main__":
 
     print(f"Session name: {session_name}")
 
-    preprocessed_folders = [p for p in preprocessed_folder.iterdir() if p.is_dir() and "preprocessed_" in p.name]
-    spikesorted_folders = [p for p in spikesorted_folder.iterdir() if p.is_dir() and "spikesorted_" in p.name]
-    postprocessed_folders = [
-        p
-        for p in postprocessed_folder.iterdir()
-        if p.is_dir() and "postprocessed_" in p.name and "-sorting" not in p.name
+    # Retrieve recording_names from preprocessed folder
+    recording_names = [
+        "_".join(p.name.split("_")[1:])
+        for p in preprocessed_folder.iterdir()
+        if p.is_dir() and "preprocessed_" in p.name
     ]
-    curated_folders = [p for p in curation_folder.iterdir() if p.is_dir() and "curated_" in p.name]
 
     # loop through block-streams
-    for curated_folder in curated_folders:
+    for recording_name in recording_names:
         t_visualization_start = time.perf_counter()
         datetime_start_visualization = datetime.now()
         visualization_output = {}
 
-        recording_name = ("_").join(curated_folder.name.split("_")[1:])
-        waveforms_folder = postprocessed_folder / f"postprocessed_{recording_name}"
         recording_folder = preprocessed_folder / f"preprocessed_{recording_name}"
+        waveforms_folder = postprocessed_folder / f"postprocessed_{recording_name}"
         preprocessed_json_file = preprocessed_folder / f"preprocessedviz_{recording_name}.json"
-        curated_folder = curation_folder / f"curated_{recording_name}"
+        qc_file = curation_folder / f"qc_{recording_name}.npy"
+        unit_classifier_file = unit_classifier_folder / f"unit_classifier_{recording_name}.csv"
         motion_folder = preprocessed_folder / f"motion_{recording_name}"
         visualization_output_process_json = results_folder / f"{data_process_prefix}_{recording_name}.json"
         # save vizualization output
@@ -157,7 +186,7 @@ if __name__ == "__main__":
             # locally_exclusive + pipeline steps LocalizeCenterOfMass + PeakToPeakFeature
             drift_data = preprocessing_vizualization_data[recording_name]["drift"]
             try:
-                recording = si.load_extractor(drift_data["recording"], base_folder=data_folder)
+                recording = si.load_extractor(drift_data["recording"], base_folder=preprocessed_folder)
 
                 # Here we use the node pipeline implementation
                 peak_detector_node = DetectPeakLocallyExclusive(recording, **visualization_params["drift"]["detection"])
@@ -179,8 +208,8 @@ if __name__ == "__main__":
                 )
                 print(f"\tDetected {len(peaks)} peaks")
                 peak_amps = peaks["amplitude"]
-            except:
-                print(f"\t\tCould not load drift recording. Skipping")
+            except Exception as e:
+                print(f"\t\tCould not load drift recording. Error:\n{e}\nSkipping")
                 skip_drift = True
 
         if not skip_drift:
@@ -267,7 +296,7 @@ if __name__ == "__main__":
                 try:
                     rec = si.load_extractor(rec_dict, base_folder=data_folder)
                 except:
-                    print(f"\t\tCould not load layer {layer}. Skipping")
+                    print(f"\t\tCould not load layer {layer}. Error:\n{e}\nSkipping")
                     continue
                 chunk = si.get_random_data_chunks(rec)
                 max_value = np.quantile(chunk, 0.99) * 1.2
@@ -353,12 +382,40 @@ if __name__ == "__main__":
 
         # sorting summary
         print(f"\tVisualizing sorting summary")
-        if waveforms_folder.is_dir() and curated_folder.is_dir():
+        if waveforms_folder.is_dir():
             we = si.load_waveforms(waveforms_folder, with_recording=False)
-            we._recording = si.load_extractor(recording_folder)
-            sorting_precurated = si.load_extractor(curated_folder)
-            # set waveform_extractor sorting object to have pass_qc property
-            we.sorting = sorting_precurated
+            we.set_recording(si.load_extractor(recording_folder))
+
+            unit_table_properties = []
+            # add firing rate and amplitude columns
+            if we.has_extension("quality_metrics"):
+                qm = we.load_extension("quality_metrics").get_data()
+                if "firing_rate" in qm.columns:
+                    firing_rates = np.round(qm["firing_rate"].values, 2)
+                    we.sorting.set_property("firing_rate", firing_rates)
+                    unit_table_properties.append("firing_rate")
+                if "amplitude_median" in qm.columns:
+                    unit_amplitudes = np.round(qm["amplitude_median"].values, 2)
+                    we.sorting.set_property("amplitude", unit_amplitudes)
+                    unit_table_properties.append("amplitude")
+
+            # add curation column
+            if qc_file.is_file():
+                # add qc property to we sorting
+                default_qc = np.load(qc_file)
+                we.sorting.set_property("default_qc", default_qc)
+                unit_table_properties.append("default_qc")
+
+            # add noise decoder column
+            if unit_classifier_file.is_file():
+                # add decoder_label and decoder probability
+                unit_classifier_df = pd.read_csv(unit_classifier_file, index_col=False)
+                decoder_label = unit_classifier_df["decoder_label"]
+                we.sorting.set_property("decoder_label", decoder_label)
+                unit_table_properties.append("decoder_label")
+                decoder_prob = np.round(unit_classifier_df["decoder_probability"], 2)
+                we.sorting.set_property("decoder_prob", decoder_prob)
+                unit_table_properties.append("decoder_prob")
 
             # retrieve sorter name (if spike sorting was performed)
             data_process_spikesorting_json = spikesorted_folder / f"data_process_spikesorting_{recording_name}.json"
@@ -379,7 +436,8 @@ if __name__ == "__main__":
                     generate_url=False,
                 ).view
                 v_sorting = sw.plot_sorting_summary(
-                    we, unit_table_properties=["default_qc"], curation=True, backend="sortingview", generate_url=False
+                    we, unit_table_properties=unit_table_properties, curation=True, 
+                    label_choices=LABEL_CHOICES, backend="sortingview", generate_url=False
                 ).view
 
                 v_summary = vv.TabLayout(
