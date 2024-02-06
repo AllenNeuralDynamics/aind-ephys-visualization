@@ -17,6 +17,3 @@ RUN pip install -U --no-cache-dir \
     pyvips==2.2.1 \
     spikeinterface[full,widgets]==0.100.0 \
     wavpack-numcodecs==0.1.5
-
-COPY postInstall /
-RUN /postInstall
