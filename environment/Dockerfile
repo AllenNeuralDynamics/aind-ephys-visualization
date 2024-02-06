@@ -9,15 +9,10 @@ ARG KACHERY_CLOUD_CLIENT_ID
 ARG KACHERY_CLOUD_PRIVATE_KEY
 ARG KACHERY_ZONE
 
-ARG GIT_ASKPASS
-ARG GIT_ACCESS_TOKEN
-COPY git-askpass /
-
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-        fonts-freefont-ttf=20120503-10 \
-        libvips \
-        msttcorefonts \
+        build-essential \
+        software-properties-common \
     && rm -rf /var/lib/apt/lists/*
 
 RUN pip install -U --no-cache-dir \
@@ -26,5 +21,8 @@ RUN pip install -U --no-cache-dir \
     spikeinterface[full,widgets]==0.100.0 \
     wavpack-numcodecs==0.1.5
 
-COPY postInstall /
-RUN /postInstall
+RUN pip install -U --no-cache-dir \
+    aind-data-schema==0.22.1 \
+    pyvips==2.2.1 \
+    wavpack-numcodecs==0.1.5 \
+    spikeinterface[full,widgets]==0.99.1
