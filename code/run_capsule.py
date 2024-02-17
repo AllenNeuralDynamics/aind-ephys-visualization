@@ -166,18 +166,27 @@ if __name__ == "__main__":
 
         # use spike locations
         skip_drift = False
-
+        spike_locations_available = False
+        # use spike locations
         if waveforms_folder.is_dir():
-            print(f"\tVisualizing drift maps using spike sorted data")
-            we = si.load_waveforms(waveforms_folder, with_recording=False)
-            # here recording_folder MUST exist
-            assert recording_folder.is_dir(), f"Recording folder {recording_folder} does not exist"
-            recording = si.load_extractor(recording_folder)
-            peaks = we.sorting.to_spike_vector()
-            peak_locations = we.load_extension("spike_locations").get_data()
-            peak_amps = np.concatenate(we.load_extension("spike_amplitudes").get_data())
-        # otherwise detect peaks
-        else:
+            try:
+                we = si.load_waveforms(waveforms_folder, with_recording=False)
+                # here recording_folder MUST exist
+                assert recording_folder.is_dir(), f"Recording folder {recording_folder} does not exist"
+                recording = si.load_extractor(recording_folder)
+                if we.has_extension("spike_locations"):
+                    print(f"\tVisualizing drift maps using spike sorted data")
+                    peaks = we.sorting.to_spike_vector()
+                    peak_locations = we.load_extension("spike_locations").get_data()
+                    peak_amps = np.concatenate(we.load_extension("spike_amplitudes").get_data())
+                    spike_locations_available = True
+            except:
+                print(
+                    f"\tCould not load waveform extractor or recording for {recording_name}"
+                )
+
+        # if spike locations are not available, detect and localize peaks
+        if not spike_locations_available:
             from spikeinterface.core.node_pipeline import ExtractDenseWaveforms, run_node_pipeline
             from spikeinterface.sortingcomponents.peak_detection import DetectPeakLocallyExclusive
             from spikeinterface.sortingcomponents.peak_localization import LocalizeCenterOfMass
@@ -381,10 +390,14 @@ if __name__ == "__main__":
                 print(f"Something wrong when visualizing timeseries: {e}")
 
         # sorting summary
-        print(f"\tVisualizing sorting summary")
         if waveforms_folder.is_dir():
-            we = si.load_waveforms(waveforms_folder, with_recording=False)
-            we.set_recording(si.load_extractor(recording_folder))
+            try:
+                we = si.load_waveforms(waveforms_folder, with_recording=False)
+                we.set_recording(si.load_extractor(recording_folder))
+                print(f"\tVisualizing sorting summary")
+            except:
+                print(f"\tSkipping sorting summary visualization for {recording_name}. No sorting information available")
+                continue
 
             unit_table_properties = []
             # add firing rate and amplitude columns
