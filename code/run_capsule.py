@@ -91,11 +91,6 @@ if __name__ == "__main__":
 
     ###### VISUALIZATION #########
     print("\n\nVISUALIZATION")
-
-    print("DEBUG: input files")
-    for p in data_folder.iterdir():
-        print(p.name)
-
     t_visualization_start_all = time.perf_counter()
     datetime_start_visualization = datetime.now()
 
@@ -516,9 +511,5 @@ if __name__ == "__main__":
     # save vizualization output
     t_visualization_end_all = time.perf_counter()
     elapsed_time_visualization_all = np.round(t_visualization_end_all - t_visualization_start_all, 2)
-
-    print("DEBUG: output files")
-    for p in results_folder.iterdir():
-        print(p.name)
 
     print(f"VISUALIZATION time: {elapsed_time_visualization_all}s")
