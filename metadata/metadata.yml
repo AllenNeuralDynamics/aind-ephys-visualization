@@ -1,5 +1,16 @@
 metadata_version: 1
 name: Visualize Ecephys
-description: Basic structure of a capsule to be customized as needed.
+description: |-
+  This capsule is designed to visualize ephys and spike sorted data for the AIND pipeline.
+
+  Visualizations is done using the sortingview backend of the spikeinterface.widgets module and uses the Figurl technology to produce cloud-based shareable links.
+
+  Two types of visualizations are produced:
+
+  * traces: raw, preprocessed, and drift visualizations
+  * sorting summary: spike sorting results for visualization and curation
+tags:
+- ecephys
 authors:
 - name: AIND
+- name: Alessio Buccino

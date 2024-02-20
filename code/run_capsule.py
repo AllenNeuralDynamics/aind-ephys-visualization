@@ -31,7 +31,7 @@ from aind_data_schema.core.processing import DataProcess
 
 
 URL = "https://github.com/AllenNeuralDynamics/aind-ephys-visualization"
-VERSION = "0.1.0"
+VERSION = "1.0"
 
 GH_CURATION_REPO = "gh://AllenNeuralDynamics/ephys-sorting-manual-curation/main"
 LABEL_CHOICES = ["noise", "MUA", "SUA", "pMUA", "pSUA"]
@@ -395,15 +395,17 @@ if __name__ == "__main__":
                 print(f"Something wrong when visualizing timeseries: {e}")
 
         # sorting summary
+        skip_sorting_summary = True
         if waveforms_folder.is_dir():
             try:
                 we = si.load_waveforms(waveforms_folder, with_recording=False)
                 we.set_recording(si.load_extractor(recording_folder))
                 print(f"\tVisualizing sorting summary")
+                skip_sorting_summary = False
             except:
-                print(f"\tSkipping sorting summary visualization for {recording_name}. No sorting information available")
-                continue
+                pass
 
+        if not skip_sorting_summary:
             unit_table_properties = []
             # add firing rate and amplitude columns
             if we.has_extension("quality_metrics"):
@@ -478,9 +480,9 @@ if __name__ == "__main__":
                 except Exception as e:
                     print("KCL error", e)
             else:
-                print("No units after curation!")
+                print("\tSkipping sorting summary visualization for {recording_name}. No units after curation.")
         else:
-            print(f"\tSkipping sorting summary visualization for {recording_name}. No sorting information available")
+            print(f"\tSkipping sorting summary visualization for {recording_name}. No sorting information available.")
 
         # save params in output
         visualization_notes = json.dumps(visualization_output, indent=4)
