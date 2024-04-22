@@ -1,5 +1,6 @@
-# hash:sha256:607b517c3d9636b64c2b10a6e06158526e437c21bb4c759034688d5684b8386e
-FROM registry.codeocean.allenneuraldynamics.org/codeocean/jupyterlab:3.6.1-miniconda4.12.0-python3.9-ubuntu20.04
+# hash:sha256:64284bcb414450aaca0aae3525308ef1db7fa51672f7eb672705f055734737f9
+ARG REGISTRY_HOST
+FROM $REGISTRY_HOST/codeocean/jupyterlab:3.6.1-miniconda4.12.0-python3.9-ubuntu20.04
 
 ARG DEBIAN_FRONTEND=noninteractive
 ARG AWS_ACCESS_KEY_ID
@@ -23,5 +24,7 @@ RUN apt-get update \
 RUN pip install -U --no-cache-dir \
     aind-data-schema==0.19.1 \
     pyvips==2.2.1 \
-    spikeinterface[full,widgets]==0.100.0 \
     wavpack-numcodecs==0.1.5
+
+COPY postInstall /
+RUN /postInstall

@@ -142,7 +142,7 @@ if __name__ == "__main__":
         visualization_output = {}
 
         recording_folder = preprocessed_folder / f"preprocessed_{recording_name}"
-        waveforms_folder = postprocessed_folder / f"postprocessed_{recording_name}"
+        analyzer_folder = postprocessed_folder / f"postprocessed_{recording_name}"
         preprocessed_json_file = preprocessed_folder / f"preprocessedviz_{recording_name}.json"
         qc_file = curation_folder / f"qc_{recording_name}.npy"
         unit_classifier_file = unit_classifier_folder / f"unit_classifier_{recording_name}.csv"
@@ -168,21 +168,21 @@ if __name__ == "__main__":
         skip_drift = False
         spike_locations_available = False
         # use spike locations
-        if waveforms_folder.is_dir():
+        if analyzer_folder.is_dir():
             try:
-                we = si.load_waveforms(waveforms_folder, with_recording=False)
+                analyzer = si.load_sorting_analyzer(analyzer_folder)
                 # here recording_folder MUST exist
                 assert recording_folder.is_dir(), f"Recording folder {recording_folder} does not exist"
                 recording = si.load_extractor(recording_folder)
-                if we.has_extension("spike_locations"):
+                if analyzer.has_extension("spike_locations"):
                     print(f"\tVisualizing drift maps using spike sorted data")
-                    peaks = we.sorting.to_spike_vector()
-                    peak_locations = we.load_extension("spike_locations").get_data()
-                    peak_amps = np.concatenate(we.load_extension("spike_amplitudes").get_data())
+                    peaks = analyzer.sorting.to_spike_vector()
+                    peak_locations = analyzer.get_extension("spike_locations").get_data()
+                    peak_amps = analyzer.get_extension("spike_amplitudes").get_data()
                     spike_locations_available = True
             except:
                 print(
-                    f"\tCould not load waveform extractor or recording for {recording_name}"
+                    f"\tCould not load sorting analyzer or recording for {recording_name}"
                 )
 
         # if spike locations are not available, detect and localize peaks
@@ -391,10 +391,10 @@ if __name__ == "__main__":
 
         # sorting summary
         skip_sorting_summary = True
-        if waveforms_folder.is_dir():
+        if analyzer_folder.is_dir():
             try:
-                we = si.load_waveforms(waveforms_folder, with_recording=False)
-                we.set_recording(si.load_extractor(recording_folder))
+                analyzer = si.load_sorting_analyzer(analyzer_folder)
+                # analyzer.set_recording(si.load_extractor(recording_folder))
                 print(f"\tVisualizing sorting summary")
                 skip_sorting_summary = False
             except:
@@ -403,22 +403,22 @@ if __name__ == "__main__":
         if not skip_sorting_summary:
             unit_table_properties = []
             # add firing rate and amplitude columns
-            if we.has_extension("quality_metrics"):
-                qm = we.load_extension("quality_metrics").get_data()
+            if analyzer.has_extension("quality_metrics"):
+                qm = analyzer.get_extension("quality_metrics").get_data()
                 if "firing_rate" in qm.columns:
                     firing_rates = np.round(qm["firing_rate"].values, 2)
-                    we.sorting.set_property("firing_rate", firing_rates)
+                    analyzer.sorting.set_property("firing_rate", firing_rates)
                     unit_table_properties.append("firing_rate")
                 if "amplitude_median" in qm.columns:
                     unit_amplitudes = np.round(qm["amplitude_median"].values, 2)
-                    we.sorting.set_property("amplitude", unit_amplitudes)
+                    analyzer.sorting.set_property("amplitude", unit_amplitudes)
                     unit_table_properties.append("amplitude")
 
             # add curation column
             if qc_file.is_file():
-                # add qc property to we sorting
+                # add qc property to analyzer sorting
                 default_qc = np.load(qc_file)
-                we.sorting.set_property("default_qc", default_qc)
+                analyzer.sorting.set_property("default_qc", default_qc)
                 unit_table_properties.append("default_qc")
 
             # add noise decoder column
@@ -426,10 +426,10 @@ if __name__ == "__main__":
                 # add decoder_label and decoder probability
                 unit_classifier_df = pd.read_csv(unit_classifier_file, index_col=False)
                 decoder_label = unit_classifier_df["decoder_label"]
-                we.sorting.set_property("decoder_label", decoder_label)
+                analyzer.sorting.set_property("decoder_label", decoder_label)
                 unit_table_properties.append("decoder_label")
                 decoder_prob = np.round(unit_classifier_df["decoder_probability"], 2)
-                we.sorting.set_property("decoder_prob", decoder_prob)
+                analyzer.sorting.set_property("decoder_prob", decoder_prob)
                 unit_table_properties.append("decoder_prob")
 
             # retrieve sorter name (if spike sorting was performed)
@@ -441,17 +441,17 @@ if __name__ == "__main__":
             else:
                 sorter_name = "unknown"
 
-            if len(we.sorting.unit_ids) > 0:
+            if len(analyzer.unit_ids) > 0:
                 # tab layout with Summary and Quality Metrics
                 v_qm = sw.plot_quality_metrics(
-                    we,
+                    analyzer,
                     skip_metrics=["isi_violations_count", "rp_violations"],
                     include_metrics_data=True,
                     backend="sortingview",
                     generate_url=False,
                 ).view
                 v_sorting = sw.plot_sorting_summary(
-                    we, unit_table_properties=unit_table_properties, curation=True, 
+                    analyzer, unit_table_properties=unit_table_properties, curation=True, 
                     label_choices=LABEL_CHOICES, backend="sortingview", generate_url=False
                 ).view
 
