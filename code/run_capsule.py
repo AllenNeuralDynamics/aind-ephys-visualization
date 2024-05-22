@@ -346,6 +346,7 @@ if __name__ == "__main__":
                                 segment_index=segment_index,
                                 clim=clims_full,
                                 backend="sortingview",
+                                mode="map",
                                 generate_url=False,
                             )
                             if recording_proc_dict is not None:
@@ -356,6 +357,7 @@ if __name__ == "__main__":
                                     segment_index=segment_index,
                                     clim=clims_proc,
                                     backend="sortingview",
+                                    mode="map",
                                     generate_url=False,
                                 )
                                 view = vv.Splitter(
