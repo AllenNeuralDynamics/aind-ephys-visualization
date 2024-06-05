@@ -329,65 +329,66 @@ if __name__ == "__main__":
 
             fs = recording.sampling_frequency
             n_snippets_per_seg = visualization_params["timeseries"]["n_snippets_per_segment"]
-            try:
-                for segment_index in range(recording.get_num_segments()):
-                    segment_duration = recording.get_num_samples(segment_index) / fs
-                    # evenly distribute t_starts across segments
-                    t_starts = np.linspace(0, segment_duration, n_snippets_per_seg + 2)[1:-1]
-                    for t_start in t_starts:
-                        time_range = np.round(
-                            np.array([t_start, t_start + visualization_params["timeseries"]["snippet_duration_s"]]), 1
+            # try:
+            for segment_index in range(recording.get_num_segments()):
+                segment_duration = recording.get_num_samples(segment_index) / fs
+                # evenly distribute t_starts across segments
+                t_start_segment = recording.get_times(segment_index=segment_index)[0]
+                t_starts = np.linspace(t_start_segment, t_start_segment + segment_duration, n_snippets_per_seg + 2)[1:-1]
+                for t_start in t_starts:
+                    time_range = np.round(
+                        np.array([t_start, t_start + visualization_params["timeseries"]["snippet_duration_s"]]), 1
+                    )
+                    if not skip_timeseries:
+                        w_full = sw.plot_traces(
+                            recording_full_loaded,
+                            order_channel_by_depth=True,
+                            time_range=time_range,
+                            segment_index=segment_index,
+                            clim=clims_full,
+                            backend="sortingview",
+                            generate_url=False,
                         )
-                        if not skip_timeseries:
-                            w_full = sw.plot_timeseries(
-                                recording_full_loaded,
+                        if recording_proc_dict is not None:
+                            w_proc = sw.plot_traces(
+                                recording_proc_loaded,
                                 order_channel_by_depth=True,
                                 time_range=time_range,
                                 segment_index=segment_index,
-                                clim=clims_full,
+                                clim=clims_proc,
                                 backend="sortingview",
                                 generate_url=False,
                             )
-                            if recording_proc_dict is not None:
-                                w_proc = sw.plot_timeseries(
-                                    recording_proc_loaded,
-                                    order_channel_by_depth=True,
-                                    time_range=time_range,
-                                    segment_index=segment_index,
-                                    clim=clims_proc,
-                                    backend="sortingview",
-                                    generate_url=False,
-                                )
-                                view = vv.Splitter(
-                                    direction="horizontal",
-                                    item1=vv.LayoutItem(w_full.view),
-                                    item2=vv.LayoutItem(w_proc.view),
-                                )
-                            else:
-                                view = w_full.view
-                            v_item = vv.TabLayoutItem(
-                                label=f"Timeseries - Segment {segment_index} - Time: {time_range}", view=view
+                            view = vv.Splitter(
+                                direction="horizontal",
+                                item1=vv.LayoutItem(w_full.view),
+                                item2=vv.LayoutItem(w_proc.view),
                             )
-                            timeseries_tab_items.append(v_item)
-                if not skip_timeseries:
-                    # add drift map
-                    timeseries_tab_items.append(v_drift)
+                        else:
+                            view = w_full.view
+                        v_item = vv.TabLayoutItem(
+                            label=f"Timeseries - Segment {segment_index} - Time: {time_range}", view=view
+                        )
+                        timeseries_tab_items.append(v_item)
+            if not skip_timeseries:
+                # add drift map
+                timeseries_tab_items.append(v_drift)
 
-                    # add motion if available
-                    if v_motion is not None:
-                        timeseries_tab_items.append(v_motion)
+                # add motion if available
+                if v_motion is not None:
+                    timeseries_tab_items.append(v_motion)
 
-                    v_timeseries = vv.TabLayout(items=timeseries_tab_items)
-                    try:
-                        url = v_timeseries.url(label=f"{session_name} - {recording_name}")
-                        print(f"\n{url}\n")
-                        visualization_output["timeseries"] = url
-                    except Exception as e:
-                        print("KCL error", e)
-                else:
-                    print(f"\tSkipping timeseries for testing")
-            except Exception as e:
-                print(f"Something wrong when visualizing timeseries: {e}")
+                v_timeseries = vv.TabLayout(items=timeseries_tab_items)
+                try:
+                    url = v_timeseries.url(label=f"{session_name} - {recording_name}")
+                    print(f"\n{url}\n")
+                    visualization_output["timeseries"] = url
+                except Exception as e:
+                    print("KCL error", e)
+            else:
+                print(f"\tSkipping timeseries for testing")
+            # except Exception as e:
+            #     print(f"Something wrong when visualizing timeseries: {e}")
 
         # sorting summary
         skip_sorting_summary = True
