@@ -339,7 +339,7 @@ if __name__ == "__main__":
                             np.array([t_start, t_start + visualization_params["timeseries"]["snippet_duration_s"]]), 1
                         )
                         if not skip_timeseries:
-                            w_full = sw.plot_timeseries(
+                            w_full = sw.plot_traces(
                                 recording_full_loaded,
                                 order_channel_by_depth=True,
                                 time_range=time_range,
@@ -350,7 +350,7 @@ if __name__ == "__main__":
                                 generate_url=False,
                             )
                             if recording_proc_dict is not None:
-                                w_proc = sw.plot_timeseries(
+                                w_proc = sw.plot_traces(
                                     recording_proc_loaded,
                                     order_channel_by_depth=True,
                                     time_range=time_range,
