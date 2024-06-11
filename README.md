@@ -29,17 +29,45 @@ The `data/` folder must include:
 
 The `code/run` script takes no arguments.
 
-A list of visualization parameters can be found at the top of the `code/run_capsule.py` script:
+A list of visualization parameters can in the `code/params.json`:
 
 ```python
-visualization_params = dict(
-    timeseries=dict(n_snippets_per_segment=2, snippet_duration_s=0.5, skip=False),
-    drift=dict(detection=dict(method='locally_exclusive', peak_sign='neg', detect_threshold=5, exclude_sweep_ms=0.1), 
-               localization=dict(ms_before=0.1, ms_after=0.3, local_radius_um=100.),
-               n_skip=30, alpha=0.15, vmin=-200, vmax=0, cmap="Greys_r",
-               figsize=(10, 10)),
-    motion=dict(cmap="Greys_r", scatter_decimate=15, figsize=(15, 10))
-)
+{
+    "job_kwargs": {
+        "chunk_duration": "1s",
+        "progress_bar": false
+    },
+    "visualization": {
+        "timeseries": {
+            "n_snippets_per_segment": 2,
+            "snippet_duration_s": 0.5,
+            "skip": false
+        },
+        "drift": {
+            "detection": {
+                "peak_sign": "neg", 
+                "detect_threshold": 5, 
+                "exclude_sweep_ms": 0.1
+            },
+            "localization": {
+                "ms_before": 0.1, 
+                "ms_after": 0.3, 
+                "radius_um": 100.0
+            },
+            "n_skip": 30,
+            "alpha": 0.15,
+            "vmin": -200,
+            "vmax": 0,
+            "cmap": "Greys_r",
+            "figsize": [10, 10]
+        },
+        "motion": {
+            "cmap": "Greys_r", 
+            "scatter_decimate": 15, 
+            "figsize": [15, 10]
+        }
+    }
+}
 ```
 
 ### Output
