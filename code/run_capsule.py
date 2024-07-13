@@ -217,6 +217,9 @@ if __name__ == "__main__":
                 )
                 print(f"\tDetected {len(peaks)} peaks")
                 peak_amps = peaks["amplitude"]
+                if len(peaks) == 0:
+                    print("\tNo peaks detected. Skipping drift map")
+                    skip_drift = True
             except Exception as e:
                 print(f"\t\tCould not load drift recording. Error:\n{e}\nSkipping")
                 skip_drift = True
