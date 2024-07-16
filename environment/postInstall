@@ -1,4 +1,4 @@
 #!/usr/bin/env bash
 set -e
 
-pip install --no-cache-dir spikeinterface[full]==0.101.0rc1
+pip install --no-cache-dir spikeinterface[full,widgets]==0.101.0rc1
