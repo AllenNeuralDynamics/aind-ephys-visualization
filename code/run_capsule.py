@@ -140,7 +140,8 @@ if __name__ == "__main__":
         visualization_output = {}
 
         recording_folder = preprocessed_folder / f"preprocessed_{recording_name}"
-        analyzer_folder = postprocessed_folder / f"postprocessed_{recording_name}"
+        analyzer_binary_folder = postprocessed_folder / f"postprocessed_{recording_name}"
+        analyzer_zarr_folder = postprocessed_folder / f"postprocessed_{recording_name}.zarr"
         preprocessed_json_file = preprocessed_folder / f"preprocessedviz_{recording_name}.json"
         qc_file = curation_folder / f"qc_{recording_name}.npy"
         unit_classifier_file = unit_classifier_folder / f"unit_classifier_{recording_name}.csv"
@@ -158,7 +159,13 @@ if __name__ == "__main__":
         skip_drift = False
         spike_locations_available = False
         # use spike locations
-        if analyzer_folder.is_dir():
+        analyzer_folder = None
+        if analyzer_binary_folder.is_dir():
+            analyzer_folder = analyzer_binary_folder
+        elif analyzer_zarr_folder.is_dir():
+            analyzer_folder = analyzer_zarr_folder
+        print("Analyzer folder:", analyzer_folder)
+        if analyzer_folder is not None:
             try:
                 analyzer = si.load_sorting_analyzer(analyzer_folder)
                 # here recording_folder MUST exist
@@ -378,7 +385,7 @@ if __name__ == "__main__":
 
         # sorting summary
         skip_sorting_summary = True
-        if analyzer_folder.is_dir():
+        if analyzer_folder is not None:
             try:
                 analyzer = si.load_sorting_analyzer(analyzer_folder)
                 # analyzer.set_recording(si.load_extractor(recording_folder))
