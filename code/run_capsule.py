@@ -210,6 +210,10 @@ if __name__ == "__main__":
                     recording, nodes=pipeline_nodes, job_kwargs=si.get_global_job_kwargs()
                 )
                 print(f"\t\tDetected {len(peaks)} peaks")
+                peak_amps = peaks["amplitude"]
+                if len(peaks) == 0:
+                    print("\t\tNo peaks detected. Skipping drift map")
+                    skip_drift = True
             except Exception as e:
                 print(f"\t\tCould not load drift recording. Error:\n{e}\nSkipping")
                 skip_drift = True
