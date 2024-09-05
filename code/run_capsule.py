@@ -133,6 +133,14 @@ if __name__ == "__main__":
         if p.is_dir() and "preprocessed_" in p.name
     ]
 
+    job_json_files = [p for p in data_folder.iterdir() if p.suffix == ".json" and "job" in p.name]
+    job_dicts = []
+    for job_json_file in job_json_files:
+        with open(job_json_file) as f:
+            job_dict = json.load(f)
+        job_dicts.append(job_dict)
+    print(f"Found {len(job_dicts)} JSON job files")
+
     # loop through block-streams
     for recording_name in recording_names:
         t_visualization_start = time.perf_counter()
@@ -155,6 +163,18 @@ if __name__ == "__main__":
         with open(preprocessed_json_file, "r") as f:
             preprocessing_vizualization_data = json.load(f)
 
+        recording_job_dict = None
+        for job_dict in job_dicts:
+            if recording_name in job_dict["recording_name"]:
+                print("\tFound JSON file associated to recording")
+                recording_job_dict = job_dict
+                break
+
+        if recording_job_dict is not None:
+            skip_times = recording_job_dict.get("skip_times", False)
+        else:
+            skip_times = False
+
         # use spike locations
         skip_drift = False
         spike_locations_available = False
@@ -171,6 +191,8 @@ if __name__ == "__main__":
                 # here recording_folder MUST exist
                 assert recording_folder.is_dir(), f"Recording folder {recording_folder} does not exist"
                 recording = si.load_extractor(recording_folder)
+                if skip_times:
+                    recording.reset_times()
                 if analyzer.has_extension("spike_locations"):
                     print(f"\tVisualizing drift maps using spike sorted data")
                     spike_locations_available = True
@@ -190,6 +212,8 @@ if __name__ == "__main__":
             drift_data = preprocessing_vizualization_data[recording_name]["drift"]
             try:
                 recording = si.load_extractor(drift_data["recording"], base_folder=preprocessed_folder)
+                if skip_times:
+                    recording.reset_times()
 
                 # Here we use the node pipeline implementation
                 peak_detector_node = DetectPeakLocallyExclusive(recording, **visualization_params["drift"]["detection"])
@@ -307,6 +331,8 @@ if __name__ == "__main__":
         for layer, rec_dict in recording_full_dict.items():
             try:
                 rec = si.load_extractor(rec_dict, base_folder=data_folder)
+                if skip_times:
+                    recording.reset_times()
             except Exception as e:
                 print(f"\t\tCould not load layer {layer}. Error:\n{e}\nSkipping")
                 continue
@@ -320,6 +346,8 @@ if __name__ == "__main__":
             for layer, rec_dict in recording_proc_dict.items():
                 try:
                     rec = si.load_extractor(rec_dict, base_folder=data_folder)
+                    if skip_times:
+                        recording.reset_times()
                 except:
                     print(f"\t\tCould not load layer {layer}. Skipping")
                     continue
@@ -392,7 +420,6 @@ if __name__ == "__main__":
         if analyzer_folder is not None:
             try:
                 analyzer = si.load_sorting_analyzer(analyzer_folder)
-                # analyzer.set_recording(si.load_extractor(recording_folder))
                 print(f"\tVisualizing sorting summary")
                 skip_sorting_summary = False
             except:
