@@ -332,7 +332,7 @@ if __name__ == "__main__":
             try:
                 rec = si.load_extractor(rec_dict, base_folder=data_folder)
                 if skip_times:
-                    recording.reset_times()
+                    rec.reset_times()
             except Exception as e:
                 print(f"\t\tCould not load layer {layer}. Error:\n{e}\nSkipping")
                 continue
@@ -347,7 +347,7 @@ if __name__ == "__main__":
                 try:
                     rec = si.load_extractor(rec_dict, base_folder=data_folder)
                     if skip_times:
-                        recording.reset_times()
+                        rec.reset_times()
                 except:
                     print(f"\t\tCould not load layer {layer}. Skipping")
                     continue
