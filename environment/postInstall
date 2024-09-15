@@ -2,8 +2,8 @@
 set -e
 
 pip uninstall -y spikeinterface
-git clone https://github.com/SpikeInterface/spikeinterface.git
+git clone https://github.com/alejoe91/spikeinterface.git
 cd spikeinterface
-git checkout f64ad5f4609f3c0c6054595ba784073477d016fd
+git checkout aac1029362b660c5c83a21f142bef14ba81ed8b5
 pip install --no-cache-dir .[full]
 cd ..

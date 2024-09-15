@@ -430,13 +430,9 @@ if __name__ == "__main__":
             # add firing rate and amplitude columns
             if analyzer.has_extension("quality_metrics"):
                 qm = analyzer.get_extension("quality_metrics").get_data()
-                if "firing_rate" in qm.columns:
-                    firing_rates = np.round(qm["firing_rate"].values, 2)
-                    analyzer.sorting.set_property("firing_rate", firing_rates)
-                    unit_table_properties.append("firing_rate")
+                unit_table_properties.append("firing_rate")
                 if "amplitude_median" in qm.columns:
-                    unit_amplitudes = np.round(qm["amplitude_median"].values, 2)
-                    analyzer.sorting.set_property("amplitude", unit_amplitudes)
+                    analyzer.sorting.set_property("amplitude", qm["amplitude_median"].values)
                     unit_table_properties.append("amplitude")
 
             # add curation column
