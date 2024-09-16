@@ -301,9 +301,15 @@ if __name__ == "__main__":
                 figsize = visualization_params["motion"]["figsize"]
 
                 fig_motion = plt.figure(figsize=figsize)
+                # motion correction is performed after concatenation
+                # since multi-segment is not supported
+                if recording.get_num_segments() > 1:
+                    recording_c = si.concatenate_recordings([recording])
+                else:
+                    recording_c = recording
                 w_motion = sw.plot_motion_info(
                     motion_info,
-                    recording=recording,
+                    recording=recording_c,
                     figure=fig_motion,
                     color_amplitude=True,
                     amplitude_cmap=cmap,
