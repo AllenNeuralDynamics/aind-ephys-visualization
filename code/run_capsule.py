@@ -184,7 +184,7 @@ if __name__ == "__main__":
             analyzer_folder = analyzer_binary_folder
         elif analyzer_zarr_folder.is_dir():
             analyzer_folder = analyzer_zarr_folder
-        print("Analyzer folder:", analyzer_folder)
+
         if analyzer_folder is not None:
             try:
                 analyzer = si.load_sorting_analyzer(analyzer_folder)
