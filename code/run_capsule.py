@@ -438,7 +438,8 @@ if __name__ == "__main__":
                 qm = analyzer.get_extension("quality_metrics").get_data()
                 unit_table_properties.append("firing_rate")
                 if "amplitude_median" in qm.columns:
-                    analyzer.sorting.set_property("amplitude", qm["amplitude_median"].values)
+                    amplitudes = np.round(np.abs(qm["amplitude_median"].to_numpy()), 2)
+                    analyzer.sorting.set_property("amplitude", amplitudes)
                     unit_table_properties.append("amplitude")
 
             # add curation column
