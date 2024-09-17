@@ -6,8 +6,7 @@
     "visualization": {
         "timeseries": {
             "n_snippets_per_segment": 2,
-            "snippet_duration_s": 0.5,
-            "skip": false
+            "snippet_duration_s": 0.5
         },
         "drift": {
             "detection": {
