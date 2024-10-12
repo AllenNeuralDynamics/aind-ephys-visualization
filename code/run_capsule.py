@@ -382,6 +382,7 @@ if __name__ == "__main__":
                     time_range=time_range,
                     segment_index=segment_index,
                     clim=clims_full,
+                    mode="map",
                     backend="sortingview",
                     generate_url=False,
                 )
@@ -392,6 +393,7 @@ if __name__ == "__main__":
                         time_range=time_range,
                         segment_index=segment_index,
                         clim=clims_proc,
+                        mode="map",
                         backend="sortingview",
                         generate_url=False,
                     )
