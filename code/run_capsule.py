@@ -345,8 +345,11 @@ if __name__ == "__main__":
             chunk = si.get_random_data_chunks(rec)
             max_value = np.quantile(chunk, 0.99) * 1.2
             clims_full[layer] = (-max_value, max_value)
-            if not rec.has_time_vector():
-                rec.set_times(rec.get_times())
+            # explicitly set timestamps if not present
+            for segment_index in range(rec.get_num_segments()):
+                if not rec.has_time_vector(segment_index=segment_index):
+                    times = rec.get_times(segment_index=segment_index)
+                    rec.set_times(times, segment_index=segment_index, with_warning=False)
             recording_full_loaded[layer] = rec
         clims_proc = {}
         if recording_proc_dict is not None:
@@ -362,8 +365,11 @@ if __name__ == "__main__":
                 chunk = si.get_random_data_chunks(rec)
                 max_value = np.quantile(chunk, 0.99) * 1.2
                 clims_proc[layer] = (-max_value, max_value)
-                if not rec.has_time_vector():
-                    rec.set_times(rec.get_times())
+                # explicitly set timestamps if not present
+                for segment_index in range(rec.get_num_segments()):
+                    if not rec.has_time_vector(segment_index=segment_index):
+                        times = rec.get_times(segment_index=segment_index)
+                        rec.set_times(times, segment_index=segment_index, with_warning=False)
                 recording_proc_loaded[layer] = rec
         else:
             print(f"\tPreprocessed timeseries not avaliable")
