@@ -345,6 +345,8 @@ if __name__ == "__main__":
             chunk = si.get_random_data_chunks(rec)
             max_value = np.quantile(chunk, 0.99) * 1.2
             clims_full[layer] = (-max_value, max_value)
+            if not rec.has_time_vector():
+                rec.set_times(rec.get_times())
             recording_full_loaded[layer] = rec
         clims_proc = {}
         if recording_proc_dict is not None:
@@ -360,6 +362,8 @@ if __name__ == "__main__":
                 chunk = si.get_random_data_chunks(rec)
                 max_value = np.quantile(chunk, 0.99) * 1.2
                 clims_proc[layer] = (-max_value, max_value)
+                if not rec.has_time_vector():
+                    rec.set_times(rec.get_times())
                 recording_proc_loaded[layer] = rec
         else:
             print(f"\tPreprocessed timeseries not avaliable")
@@ -372,7 +376,6 @@ if __name__ == "__main__":
             times = recording.get_times(segment_index=segment_index)
             t_starts = np.linspace(times[0], times[-1], n_snippets_per_seg + 2)[1:-1]
             for t_start in t_starts:
-                print(times[0], times[-1], t_start)
                 time_range = np.round(
                     np.array([t_start, t_start + visualization_params["timeseries"]["snippet_duration_s"]]), 1
                 )
