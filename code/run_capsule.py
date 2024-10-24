@@ -368,11 +368,11 @@ if __name__ == "__main__":
         n_snippets_per_seg = visualization_params["timeseries"]["n_snippets_per_segment"]
         # try:
         for segment_index in range(recording.get_num_segments()):
-            segment_duration = recording.get_num_samples(segment_index) / fs
             # evenly distribute t_starts across segments
-            t_start_segment = recording.get_times(segment_index=segment_index)[0]
-            t_starts = np.linspace(t_start_segment, t_start_segment + segment_duration, n_snippets_per_seg + 2)[1:-1]
+            times = recording.get_times(segment_index=segment_index)
+            t_starts = np.linspace(times[0], times[-1], n_snippets_per_seg + 2)[1:-1]
             for t_start in t_starts:
+                print(times[0], times[-1], t_start)
                 time_range = np.round(
                     np.array([t_start, t_start + visualization_params["timeseries"]["snippet_duration_s"]]), 1
                 )
