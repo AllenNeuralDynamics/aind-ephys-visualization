@@ -400,15 +400,15 @@ if __name__ == "__main__":
         for segment_index in range(recording.get_num_segments()):
             traces_figsize = (int(5 * max_num_layers), int(5 * n_snippets_per_seg))
             fig_ts, axs_ts = plt.subplots(
-                ncols=max_num_layers,
-                nrows=n_snippets_per_seg,
+                ncols=n_snippets_per_seg,
+                nrows=max_num_layers,
                 figsize=traces_figsize,
             )
             fig_ts_proc = None
             if recording_proc_dict is not None:
                 fig_ts_proc, axs_ts_proc = plt.subplots(
-                    ncols=max_num_layers,
-                    nrows=n_snippets_per_seg,
+                    ncols=n_snippets_per_seg,
+                    nrows=max_num_layers,
                     figsize=traces_figsize,
                 )
 
@@ -457,8 +457,8 @@ if __name__ == "__main__":
                             f"\t\tError plotting traces with SortingView for {recording_name} - {segment_index} - {time_range}"
                         )
 
-                for layer, rec in recording_full_loaded.items():
-                    ax_ts = axs_ts[i_t] if recording.get_num_segments() == 1 else axs_ts[i_t, segment_index]
+                for i_l, (layer, rec) in enumerate(recording_full_loaded.items()):
+                    ax_ts = axs_ts[i_t] if max_num_layers == 1 else axs_ts[i_l, i_t]
                     sw.plot_traces(
                         rec,
                         order_channel_by_depth=True,
@@ -468,13 +468,16 @@ if __name__ == "__main__":
                         clim=clims_full[layer],
                         backend="matplotlib",
                     )
-                    ax_ts.set_title(f"Full - {layer} - Time: {time_range}")
+                    if i_l == 0:
+                        ax_ts.set_title(f"Time: {time_range}\n{layer}")
+                    else:
+                        ax_ts.set_title(f"{layer}")
                     ax_ts.spines["top"].set_visible(False)
                     ax_ts.spines["right"].set_visible(False)
                 if recording_proc_dict is not None:
-                    for layer, rec in recording_proc_loaded.items():
+                    for i_l, (layer, rec) in enumerate(recording_proc_loaded.items()):
                         ax_ts_proc = (
-                            axs_ts_proc[i_t] if recording.get_num_segments() == 1 else axs_ts_proc[i_t, segment_index]
+                            axs_ts_proc[i_t] if max_num_layers == 1 else axs_ts_proc[i_l, i_t]
                         )
                         sw.plot_traces(
                             rec,
@@ -485,7 +488,10 @@ if __name__ == "__main__":
                             clim=clims_proc[layer],
                             backend="matplotlib",
                         )
-                        ax_ts_proc.set_title(f"Proc - {layer} - Time: {time_range}")
+                    if i_l == 0:
+                        ax_ts_proc.set_title(f"Time: {time_range}\n{layer}")
+                    else:
+                        ax_ts_proc.set_title(f"{layer}")
                         ax_ts_proc.spines["top"].set_visible(False)
                         ax_ts_proc.spines["right"].set_visible(False)
 
