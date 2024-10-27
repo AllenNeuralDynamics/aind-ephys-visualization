@@ -23,8 +23,8 @@ import spikeinterface.qualitymetrics as sqm
 
 # VIZ
 import matplotlib.pyplot as plt
-from matplotlib.colors import Normalize
 import sortingview.views as vv
+import kachery_cloud as kcl
 
 # AIND
 from aind_data_schema.core.processing import DataProcess
@@ -126,6 +126,18 @@ if __name__ == "__main__":
 
     print(f"Session name: {session_name}")
 
+    # check kachery client
+    kachery_client = kcl.get_client_info()
+    if kachery_client is not None:
+        print(f"Kachery plots enabled")
+        plot_kachery = True
+        results_fig_folder = None
+    else:
+        print(f"Kachery plots disabled. Client not found")
+        plot_kachery = False
+        results_fig_folder = results_folder / "visualization"
+        results_fig_folder.mkdir(exist_ok=True)
+
     # Retrieve recording_names from preprocessed folder
     recording_names = [
         "_".join(p.name.split("_")[1:])
@@ -197,9 +209,7 @@ if __name__ == "__main__":
                     print(f"\tVisualizing drift maps using spike sorted data")
                     spike_locations_available = True
             except Exception as e:
-                print(
-                    f"\tCould not load sorting analyzer or recording for {recording_name}: Error:\n{e}"
-                )
+                print(f"\tCould not load sorting analyzer or recording for {recording_name}: Error:\n{e}")
 
         # if spike locations are not available, detect and localize peaks
         if not spike_locations_available:
@@ -276,19 +286,21 @@ if __name__ == "__main__":
                     cmap=visualization_params["drift"]["cmap"],
                     scatter_decimate=visualization_params["drift"]["n_skip"],
                     alpha=visualization_params["drift"]["alpha"],
-                    ax=ax_drift
+                    ax=ax_drift,
                 )
                 ax_drift.spines["top"].set_visible(False)
                 ax_drift.spines["right"].set_visible(False)
 
-            fig_drift_folder = scratch_folder / "drift_maps"
+            fig_drift_folder = results_fig_folder / "drift_maps"
             fig_drift_folder.mkdir(exist_ok=True)
             fig_drift.savefig(fig_drift_folder / f"{recording_name}_drift.png", dpi=300)
 
             # make a sorting view View
-            v_drift = vv.TabLayoutItem(
-                label=f"Drift map", view=vv.Image(image_path=str(fig_drift_folder / f"{recording_name}_drift.png"))
-            )
+            v_drift = None
+            if plot_kachery:
+                v_drift = vv.TabLayoutItem(
+                    label=f"Drift map", view=vv.Image(image_path=str(fig_drift_folder / f"{recording_name}_drift.png"))
+                )
 
             # plot motion
             v_motion = None
@@ -315,13 +327,17 @@ if __name__ == "__main__":
                     amplitude_cmap=cmap,
                     scatter_decimate=scatter_decimate,
                 )
-                fig_motion.savefig(fig_drift_folder / f"{recording_name}_motion.png", dpi=300)
+
+                fig_motion_folder = results_fig_folder / "motion"
+                fig_motion_folder.mkdir(exist_ok=True)
+                fig_motion.savefig(fig_motion_folder / f"{recording_name}_motion.png", dpi=300)
 
                 # make a sorting view View
-                v_motion = vv.TabLayoutItem(
-                    label=f"Motion",
-                    view=vv.Image(image_path=str(fig_drift_folder / f"{recording_name}_motion.png")),
-                )
+                if plot_kachery:
+                    v_motion = vv.TabLayoutItem(
+                        label=f"Motion",
+                        view=vv.Image(image_path=str(fig_drift_folder / f"{recording_name}_motion.png")),
+                    )
 
         # timeseries
         timeseries_tab_items = []
@@ -376,59 +392,121 @@ if __name__ == "__main__":
 
         fs = recording.sampling_frequency
         n_snippets_per_seg = visualization_params["timeseries"]["n_snippets_per_segment"]
-        # try:
+
+        fig_traces_folder = results_fig_folder / "traces"
+        fig_traces_folder.mkdir(exist_ok=True)
+
         for segment_index in range(recording.get_num_segments()):
+            fig_ts, axs_ts = plt.subplots(
+                ncols=recording.get_num_segments(),
+                nrows=n_snippets_per_seg,
+                figsize=visualization_params["timeseries"]["figsize"],
+            )
+            fig_ts_proc = None
+            if recording_proc_dict is not None:
+                fig_ts_proc, axs_ts_proc = plt.subplots(
+                    ncols=recording.get_num_segments(),
+                    nrows=n_snippets_per_seg,
+                    figsize=visualization_params["timeseries"]["figsize"],
+                )
+
             # evenly distribute t_starts across segments
             times = recording.get_times(segment_index=segment_index)
             t_starts = np.linspace(times[0], times[-1], n_snippets_per_seg + 2)[1:-1]
-            for t_start in t_starts:
+
+            for i_t, t_start in enumerate(t_starts):
                 time_range = np.round(
                     np.array([t_start, t_start + visualization_params["timeseries"]["snippet_duration_s"]]), 1
                 )
-                w_full = sw.plot_traces(
-                    recording_full_loaded,
-                    order_channel_by_depth=True,
-                    time_range=time_range,
-                    segment_index=segment_index,
-                    clim=clims_full,
-                    backend="sortingview",
-                    generate_url=False,
-                )
-                if recording_proc_dict is not None:
-                    w_proc = sw.plot_traces(
-                        recording_proc_loaded,
+                if plot_kachery:
+                    try:
+                        w_full = sw.plot_traces(
+                            recording_full_loaded,
+                            order_channel_by_depth=True,
+                            time_range=time_range,
+                            segment_index=segment_index,
+                            clim=clims_full,
+                            backend="sortingview",
+                            generate_url=False,
+                        )
+                        if recording_proc_dict is not None:
+                            w_proc = sw.plot_traces(
+                                recording_proc_loaded,
+                                order_channel_by_depth=True,
+                                time_range=time_range,
+                                segment_index=segment_index,
+                                clim=clims_proc,
+                                backend="sortingview",
+                                generate_url=False,
+                            )
+                            view = vv.Splitter(
+                                direction="horizontal",
+                                item1=vv.LayoutItem(w_full.view),
+                                item2=vv.LayoutItem(w_proc.view),
+                            )
+                        else:
+                            view = w_full.view
+                        v_item = vv.TabLayoutItem(
+                            label=f"Timeseries - Segment {segment_index} - Time: {time_range}", view=view
+                        )
+                        timeseries_tab_items.append(v_item)
+                    except:
+                        print(
+                            f"\t\tError plotting traces with SortingView for {recording_name} - {segment_index} - {time_range}"
+                        )
+
+                for layer, rec in recording_full_loaded.items():
+                    ax_ts = axs_ts[i_t] if recording.get_num_segments() == 1 else axs_ts[i_t, segment_index]
+                    sw.plot_traces(
+                        rec,
                         order_channel_by_depth=True,
                         time_range=time_range,
                         segment_index=segment_index,
-                        clim=clims_proc,
-                        backend="sortingview",
-                        generate_url=False,
+                        ax=ax_ts,
+                        clim=clims_full[layer],
+                        backend="matplotlib",
                     )
-                    view = vv.Splitter(
-                        direction="horizontal",
-                        item1=vv.LayoutItem(w_full.view),
-                        item2=vv.LayoutItem(w_proc.view),
-                    )
-                else:
-                    view = w_full.view
-                v_item = vv.TabLayoutItem(
-                    label=f"Timeseries - Segment {segment_index} - Time: {time_range}", view=view
-                )
-                timeseries_tab_items.append(v_item)
-        # add drift map
-        timeseries_tab_items.append(v_drift)
+                    ax_ts.set_title(f"Full - {layer} - Time: {time_range}")
+                    ax_ts.spines["top"].set_visible(False)
+                    ax_ts.spines["right"].set_visible(False)
+                if recording_proc_dict is not None:
+                    for layer, rec in recording_proc_loaded.items():
+                        ax_ts_proc = (
+                            axs_ts_proc[i_t] if recording.get_num_segments() == 1 else axs_ts_proc[i_t, segment_index]
+                        )
+                        sw.plot_traces(
+                            rec,
+                            order_channel_by_depth=True,
+                            time_range=time_range,
+                            segment_index=segment_index,
+                            ax=ax_ts_proc,
+                            clim=clims_proc[layer],
+                            backend="matplotlib",
+                        )
+                        ax_ts_proc.set_title(f"Proc - {layer} - Time: {time_range}")
+                        ax_ts_proc.spines["top"].set_visible(False)
+                        ax_ts_proc.spines["right"].set_visible(False)
 
-        # add motion if available
-        if v_motion is not None:
-            timeseries_tab_items.append(v_motion)
+            fig_ts.savefig(fig_traces_folder / f"{recording_name}_traces_seg{segment_index}.png", dpi=300)
+            if fig_ts_proc is not None:
+                fig_ts_proc.savefig(fig_traces_folder / f"{recording_name}_traces_proc_seg{segment_index}.png", dpi=300)
 
-        v_timeseries = vv.TabLayout(items=timeseries_tab_items)
-        try:
-            url = v_timeseries.url(label=f"{session_name} - {recording_name}")
-            print(f"\n{url}\n")
-            visualization_output["timeseries"] = url
-        except Exception as e:
-            print(f"Figurl-Sortingview plotting error: {e}")
+        if plot_kachery:
+            # add drift map
+            if v_drift is not None:
+                timeseries_tab_items.append(v_drift)
+
+            # add motion if available
+            if v_motion is not None:
+                timeseries_tab_items.append(v_motion)
+
+            v_timeseries = vv.TabLayout(items=timeseries_tab_items)
+            try:
+                url = v_timeseries.url(label=f"{session_name} - {recording_name}")
+                print(f"\n{url}\n")
+                visualization_output["timeseries"] = url
+            except Exception as e:
+                print(f"Figurl-Sortingview plotting error: {e}")
 
         # sorting summary
         skip_sorting_summary = True
@@ -479,51 +557,59 @@ if __name__ == "__main__":
                 sorter_name = "unknown"
 
             if len(analyzer.unit_ids) > 0:
-                # tab layout with Summary and Quality Metrics
-                v_qm = sw.plot_quality_metrics(
-                    analyzer,
-                    skip_metrics=["isi_violations_count", "rp_violations"],
-                    include_metrics_data=True,
-                    backend="sortingview",
-                    generate_url=False,
-                ).view
-                v_sorting = sw.plot_sorting_summary(
-                    analyzer, unit_table_properties=unit_table_properties, curation=True, 
-                    label_choices=LABEL_CHOICES, backend="sortingview", generate_url=False
-                ).view
+                if plot_kachery:
+                    # tab layout with Summary and Quality Metrics
+                    v_qm = sw.plot_quality_metrics(
+                        analyzer,
+                        skip_metrics=["isi_violations_count", "rp_violations"],
+                        include_metrics_data=True,
+                        backend="sortingview",
+                        generate_url=False,
+                    ).view
+                    v_sorting = sw.plot_sorting_summary(
+                        analyzer,
+                        unit_table_properties=unit_table_properties,
+                        curation=True,
+                        label_choices=LABEL_CHOICES,
+                        backend="sortingview",
+                        generate_url=False,
+                    ).view
 
-                v_summary = vv.TabLayout(
-                    items=[
-                        vv.TabLayoutItem(label="Sorting summary", view=v_sorting),
-                        vv.TabLayoutItem(label="Quality Metrics", view=v_qm),
-                    ]
-                )
-
-                try:
-                    # pre-generate gh for curation
-                    gh_path = f"{GH_CURATION_REPO}/{session_name}/{recording_name}/{sorter_name}/curation.json"
-                    state = dict(sortingCuration=gh_path)
-                    url = v_summary.url(
-                        label=f"{session_name} - {recording_name} - {sorter_name} - Sorting Summary", state=state
+                    v_summary = vv.TabLayout(
+                        items=[
+                            vv.TabLayoutItem(label="Sorting summary", view=v_sorting),
+                            vv.TabLayoutItem(label="Quality Metrics", view=v_qm),
+                        ]
                     )
-                    print(f"\n{url}\n")
-                    visualization_output["sorting_summary"] = url
 
-                except Exception as e:
-                    print("KCL error", e)
+                    try:
+                        # pre-generate gh for curation
+                        gh_path = f"{GH_CURATION_REPO}/{session_name}/{recording_name}/{sorter_name}/curation.json"
+                        state = dict(sortingCuration=gh_path)
+                        url = v_summary.url(
+                            label=f"{session_name} - {recording_name} - {sorter_name} - Sorting Summary", state=state
+                        )
+                        print(f"\n{url}\n")
+                        visualization_output["sorting_summary"] = url
+
+                    except Exception as e:
+                        print("KCL error", e)
+                else:
+                    print("\tSkipping sorting summary visualization for {recording_name}. Kachery client not found.")
             else:
                 print("\tSkipping sorting summary visualization for {recording_name}. No units after curation.")
         else:
             print(f"\tSkipping sorting summary visualization for {recording_name}. No sorting information available.")
 
-        # save params in output
-        visualization_notes = json.dumps(visualization_output, indent=4)
-        # replace special characters
-        visualization_notes = visualization_notes.replace('\\"', "%22")
-        visualization_notes = visualization_notes.replace("#", "%23")
+        if plot_kachery:
+            # save params in output
+            visualization_notes = json.dumps(visualization_output, indent=4)
+            # replace special characters
+            visualization_notes = visualization_notes.replace('\\"', "%22")
+            visualization_notes = visualization_notes.replace("#", "%23")
 
-        # remove escape characters
-        visualization_output_file.write_text(visualization_notes)
+            # remove escape characters
+            visualization_output_file.write_text(visualization_notes)
 
         # save vizualization output
         t_visualization_end = time.perf_counter()
