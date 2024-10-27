@@ -127,16 +127,15 @@ if __name__ == "__main__":
     print(f"Session name: {session_name}")
 
     # check kachery client
+    results_fig_folder = results_folder / "visualization"
+    results_fig_folder.mkdir(exist_ok=True)
     kachery_client = kcl.get_client_info()
     if kachery_client is not None:
         print(f"Kachery plots enabled")
         plot_kachery = True
-        results_fig_folder = None
     else:
         print(f"Kachery plots disabled. Client not found")
         plot_kachery = False
-        results_fig_folder = results_folder / "visualization"
-        results_fig_folder.mkdir(exist_ok=True)
 
     # Retrieve recording_names from preprocessed folder
     recording_names = [
