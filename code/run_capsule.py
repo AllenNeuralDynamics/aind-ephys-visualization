@@ -398,18 +398,18 @@ if __name__ == "__main__":
         max_num_layers = max(len(recording_full_dict), len(recording_proc_dict))
 
         for segment_index in range(recording.get_num_segments()):
-            figsize = (int(5 * max_num_layers), int(5 * n_snippets_per_seg))
+            traces_figsize = (int(5 * max_num_layers), int(5 * n_snippets_per_seg))
             fig_ts, axs_ts = plt.subplots(
                 ncols=max_num_layers,
                 nrows=n_snippets_per_seg,
-                figsize=visualization_params["timeseries"]["figsize"],
+                figsize=traces_figsize,
             )
             fig_ts_proc = None
             if recording_proc_dict is not None:
                 fig_ts_proc, axs_ts_proc = plt.subplots(
                     ncols=max_num_layers,
                     nrows=n_snippets_per_seg,
-                    figsize=visualization_params["timeseries"]["figsize"],
+                    figsize=traces_figsize,
                 )
 
             # evenly distribute t_starts across segments
