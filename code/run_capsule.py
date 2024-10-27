@@ -168,6 +168,8 @@ if __name__ == "__main__":
         visualization_output_process_json = results_folder / f"{data_process_prefix}_{recording_name}.json"
         # save vizualization output
         visualization_output_file = results_folder / f"visualization_{recording_name}.json"
+        visualization_output_folder = results_folder / f"visualization_{recording_name}"
+        visualization_output_folder.mkdir(exist_ok=True)
 
         print(f"Visualizing recording: {recording_name}")
 
@@ -290,15 +292,15 @@ if __name__ == "__main__":
                 ax_drift.spines["top"].set_visible(False)
                 ax_drift.spines["right"].set_visible(False)
 
-            fig_drift_folder = results_fig_folder / "drift_maps"
-            fig_drift_folder.mkdir(exist_ok=True)
-            fig_drift.savefig(fig_drift_folder / f"{recording_name}_drift.png", dpi=300)
+            fig_drift.savefig(visualization_output_folder / "drift_map.png", dpi=300)
 
             # make a sorting view View
             v_drift = None
             if plot_kachery:
                 v_drift = vv.TabLayoutItem(
-                    label=f"Drift map", view=vv.Image(image_path=str(fig_drift_folder / f"{recording_name}_drift.png"))
+                    label=f"Drift map", view=vv.Image(
+                        image_path=str(visualization_output_folder / "drift_map.png")
+                    )
                 )
 
             # plot motion
@@ -327,15 +329,13 @@ if __name__ == "__main__":
                     scatter_decimate=scatter_decimate,
                 )
 
-                fig_motion_folder = results_fig_folder / "motion"
-                fig_motion_folder.mkdir(exist_ok=True)
-                fig_motion.savefig(fig_motion_folder / f"{recording_name}_motion.png", dpi=300)
+                fig_motion.savefig(visualization_output_folder / "motion.png", dpi=300)
 
                 # make a sorting view View
                 if plot_kachery:
                     v_motion = vv.TabLayoutItem(
                         label=f"Motion",
-                        view=vv.Image(image_path=str(fig_drift_folder / f"{recording_name}_motion.png")),
+                        view=vv.Image(image_path=str(visualization_output_folder / "motion.png")),
                     )
 
         # timeseries
@@ -495,9 +495,9 @@ if __name__ == "__main__":
                         ax_ts_proc.spines["top"].set_visible(False)
                         ax_ts_proc.spines["right"].set_visible(False)
 
-            fig_ts.savefig(fig_traces_folder / f"{recording_name}_traces_seg{segment_index}.png", dpi=300)
+            fig_ts.savefig(visualization_output_folder / f"traces_seg{segment_index}.png", dpi=300)
             if fig_ts_proc is not None:
-                fig_ts_proc.savefig(fig_traces_folder / f"{recording_name}_traces_proc_seg{segment_index}.png", dpi=300)
+                fig_ts_proc.savefig(visualization_output_folder / f"traces_proc_seg{segment_index}.png", dpi=300)
 
         if plot_kachery:
             # add drift map
