@@ -395,16 +395,19 @@ if __name__ == "__main__":
         fig_traces_folder = results_fig_folder / "traces"
         fig_traces_folder.mkdir(exist_ok=True)
 
+        max_num_layers = max(len(recording_full_dict), len(recording_proc_dict))
+
         for segment_index in range(recording.get_num_segments()):
+            figsize = (int(5 * max_num_layers), int(5 * n_snippets_per_seg))
             fig_ts, axs_ts = plt.subplots(
-                ncols=recording.get_num_segments(),
+                ncols=max_num_layers,
                 nrows=n_snippets_per_seg,
                 figsize=visualization_params["timeseries"]["figsize"],
             )
             fig_ts_proc = None
             if recording_proc_dict is not None:
                 fig_ts_proc, axs_ts_proc = plt.subplots(
-                    ncols=recording.get_num_segments(),
+                    ncols=max_num_layers,
                     nrows=n_snippets_per_seg,
                     figsize=visualization_params["timeseries"]["figsize"],
                 )
