@@ -404,6 +404,7 @@ if __name__ == "__main__":
                 nrows=max_num_layers,
                 figsize=traces_figsize,
             )
+            fig_ts.suptitle("Full traces", fontsize=16)
             fig_ts_proc = None
             if recording_proc_dict is not None:
                 fig_ts_proc, axs_ts_proc = plt.subplots(
@@ -411,6 +412,7 @@ if __name__ == "__main__":
                     nrows=max_num_layers,
                     figsize=traces_figsize,
                 )
+                fig_ts_proc.suptitle("Processed traces", fontsize=16)
 
             # evenly distribute t_starts across segments
             times = recording.get_times(segment_index=segment_index)
@@ -488,14 +490,14 @@ if __name__ == "__main__":
                             clim=clims_proc[layer],
                             backend="matplotlib",
                         )
-                    if i_l == 0:
-                        ax_ts_proc.set_title(f"Time: {time_range}\n{layer}")
-                    else:
-                        ax_ts_proc.set_title(f"{layer}")
+                        if i_l == 0:
+                            ax_ts_proc.set_title(f"Time: {time_range}\n{layer}")
+                        else:
+                            ax_ts_proc.set_title(f"{layer}")
                         ax_ts_proc.spines["top"].set_visible(False)
                         ax_ts_proc.spines["right"].set_visible(False)
 
-            fig_ts.savefig(visualization_output_folder / f"traces_seg{segment_index}.png", dpi=300)
+            fig_ts.savefig(visualization_output_folder / f"traces_full_seg{segment_index}.png", dpi=300)
             if fig_ts_proc is not None:
                 fig_ts_proc.savefig(visualization_output_folder / f"traces_proc_seg{segment_index}.png", dpi=300)
 
