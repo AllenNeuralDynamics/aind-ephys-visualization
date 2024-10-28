@@ -129,7 +129,14 @@ if __name__ == "__main__":
     # check kachery client
     results_fig_folder = results_folder / "visualization"
     results_fig_folder.mkdir(exist_ok=True)
-    kachery_client = kcl.get_client_info()
+
+    kachery_client = None
+    # further protection against kachery-cloud throwing errors
+    try:
+        kachery_client = kcl.get_client_info()
+    except:
+        pass
+
     if kachery_client is not None:
         print(f"Kachery plots enabled")
         plot_kachery = True
