@@ -559,12 +559,15 @@ if __name__ == "__main__":
             if unit_classifier_file.is_file():
                 # add decoder_label and decoder probability
                 unit_classifier_df = pd.read_csv(unit_classifier_file, index_col=False)
-                decoder_label = unit_classifier_df["decoder_label"]
-                analyzer.sorting.set_property("decoder_label", decoder_label)
-                unit_table_properties.append("decoder_label")
-                decoder_prob = np.round(unit_classifier_df["decoder_probability"], 2)
-                analyzer.sorting.set_property("decoder_prob", decoder_prob)
-                unit_table_properties.append("decoder_prob")
+                if len(unit_classifier_df) == len(analyzer.unit_ids):
+                    decoder_label = unit_classifier_df["decoder_label"]
+                    analyzer.sorting.set_property("decoder_label", decoder_label)
+                    unit_table_properties.append("decoder_label")
+                    decoder_prob = np.round(unit_classifier_df["decoder_probability"], 2)
+                    analyzer.sorting.set_property("decoder_prob", decoder_prob)
+                    unit_table_properties.append("decoder_prob")
+                else:
+                    print(f"\t\tCould not load unit classification data for {recording_name}")
 
             # retrieve sorter name (if spike sorting was performed)
             data_process_spikesorting_json = spikesorted_folder / f"data_process_spikesorting_{recording_name}.json"
