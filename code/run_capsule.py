@@ -402,7 +402,9 @@ if __name__ == "__main__":
         fig_traces_folder = results_fig_folder / "traces"
         fig_traces_folder.mkdir(exist_ok=True)
 
-        max_num_layers = max(len(recording_full_dict), len(recording_proc_dict))
+        max_full_layers = len(recording_full_dict)
+        max_proc_layers = len(recording_proc_dict) if recording_proc_dict is not None else 0
+        max_num_layers = max(max_full_layers, max_proc_layers)
 
         for segment_index in range(recording.get_num_segments()):
             traces_figsize = (int(5 * max_num_layers), int(5 * n_snippets_per_seg))
