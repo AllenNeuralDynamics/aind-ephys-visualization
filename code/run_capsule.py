@@ -618,13 +618,14 @@ if __name__ == "__main__":
         else:
             print(f"\tSkipping sorting summary visualization for {recording_name}. No sorting information available.")
 
-        if plot_kachery:
-            # save params in output
-            visualization_notes = json.dumps(visualization_output, indent=4)
-            # replace special characters
-            visualization_notes = visualization_notes.replace('\\"', "%22")
-            visualization_notes = visualization_notes.replace("#", "%23")
 
+        # save params in output
+        visualization_notes = json.dumps(visualization_output, indent=4)
+        # replace special characters
+        visualization_notes = visualization_notes.replace('\\"', "%22")
+        visualization_notes = visualization_notes.replace("#", "%23")
+
+        if plot_kachery:
             # remove escape characters
             visualization_output_file.write_text(visualization_notes)
 
