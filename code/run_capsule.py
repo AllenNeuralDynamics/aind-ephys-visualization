@@ -33,7 +33,7 @@ from aind_data_schema.core.processing import DataProcess
 URL = "https://github.com/AllenNeuralDynamics/aind-ephys-visualization"
 VERSION = "1.0"
 
-GH_CURATION_REPO = "gh://AllenNeuralDynamics/ephys-sorting-manual-curation/main"
+GH_CURATION_REPO = os.getenv("GH_CURATION_REPO")
 LABEL_CHOICES = ["noise", "MUA", "SUA", "pMUA", "pSUA"]
 
 data_folder = Path("../data/")
@@ -606,8 +606,11 @@ if __name__ == "__main__":
 
                     try:
                         # pre-generate gh for curation
-                        gh_path = f"{GH_CURATION_REPO}/{session_name}/{recording_name}/{sorter_name}/curation.json"
-                        state = dict(sortingCuration=gh_path)
+                        if GH_CURATION_REPO is not None:
+                            gh_path = f"{GH_CURATION_REPO}/{session_name}/{recording_name}/{sorter_name}/curation.json"
+                            state = dict(sortingCuration=gh_path)
+                        else:
+                            state = None
                         url = v_summary.url(
                             label=f"{session_name} - {recording_name} - {sorter_name} - Sorting Summary", state=state
                         )

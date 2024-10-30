@@ -1,4 +1,4 @@
-# hash:sha256:8a31dd48a5dd7b42c7835d4a6c5b72bcf226c1e00dc213ee986b21fdfde15290
+# hash:sha256:b85fc505af02a458435483c98f0ebe1a35c49e41942f2f023182977b303262d7
 ARG REGISTRY_HOST
 FROM $REGISTRY_HOST/codeocean/jupyterlab:3.6.1-miniconda4.12.0-python3.9-ubuntu20.04
 
@@ -13,6 +13,8 @@ ARG KACHERY_ZONE
 ARG GIT_ASKPASS
 ARG GIT_ACCESS_TOKEN
 COPY git-askpass /
+
+ENV GH_CURATION_REPO=gh://AllenNeuralDynamics/ephys-sorting-manual-curation/main
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
