@@ -305,9 +305,7 @@ if __name__ == "__main__":
             v_drift = None
             if plot_kachery:
                 v_drift = vv.TabLayoutItem(
-                    label=f"Drift map", view=vv.Image(
-                        image_path=str(visualization_output_folder / "drift_map.png")
-                    )
+                    label=f"Drift map", view=vv.Image(image_path=str(visualization_output_folder / "drift_map.png"))
                 )
 
             # plot motion
@@ -346,8 +344,8 @@ if __name__ == "__main__":
                     )
 
         # timeseries
-        timeseries_tab_items = []
         print(f"\tVisualizing timeseries")
+        timeseries_tab_items = []
 
         timeseries_data = preprocessing_vizualization_data[recording_name]["timeseries"]
         recording_full_dict = timeseries_data["full"]
@@ -439,6 +437,7 @@ if __name__ == "__main__":
                             time_range=time_range,
                             segment_index=segment_index,
                             clim=clims_full,
+                            mode="map",
                             backend="sortingview",
                             generate_url=False,
                         )
@@ -449,6 +448,7 @@ if __name__ == "__main__":
                                 time_range=time_range,
                                 segment_index=segment_index,
                                 clim=clims_proc,
+                                mode="map",
                                 backend="sortingview",
                                 generate_url=False,
                             )
@@ -465,7 +465,8 @@ if __name__ == "__main__":
                         timeseries_tab_items.append(v_item)
                     except Exception as e:
                         print(
-                            f"\t\tError plotting traces with SortingView for {recording_name} - {segment_index} - {time_range}:\nError: {e}"
+                            f"\t\tError plotting traces with SortingView for "
+                            f"{recording_name} - {segment_index} - {time_range}:\n\t\tError: {e}"
                         )
 
                 for i_l, (layer, rec) in enumerate(recording_full_loaded.items()):
@@ -487,9 +488,7 @@ if __name__ == "__main__":
                     ax_ts.spines["right"].set_visible(False)
                 if recording_proc_dict is not None:
                     for i_l, (layer, rec) in enumerate(recording_proc_loaded.items()):
-                        ax_ts_proc = (
-                            axs_ts_proc[i_t] if max_num_layers == 1 else axs_ts_proc[i_l, i_t]
-                        )
+                        ax_ts_proc = axs_ts_proc[i_t] if max_num_layers == 1 else axs_ts_proc[i_l, i_t]
                         sw.plot_traces(
                             rec,
                             order_channel_by_depth=True,
@@ -625,7 +624,6 @@ if __name__ == "__main__":
                 print("\tSkipping sorting summary visualization for {recording_name}. No units after curation.")
         else:
             print(f"\tSkipping sorting summary visualization for {recording_name}. No sorting information available.")
-
 
         # save params in output
         visualization_notes = json.dumps(visualization_output, indent=4)
