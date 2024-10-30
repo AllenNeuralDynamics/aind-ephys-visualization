@@ -463,9 +463,9 @@ if __name__ == "__main__":
                             label=f"Timeseries - Segment {segment_index} - Time: {time_range}", view=view
                         )
                         timeseries_tab_items.append(v_item)
-                    except:
+                    except Exception as e:
                         print(
-                            f"\t\tError plotting traces with SortingView for {recording_name} - {segment_index} - {time_range}"
+                            f"\t\tError plotting traces with SortingView for {recording_name} - {segment_index} - {time_range}:\nError: {e}"
                         )
 
                 for i_l, (layer, rec) in enumerate(recording_full_loaded.items()):
