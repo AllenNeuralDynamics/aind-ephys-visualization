@@ -10,6 +10,7 @@ from pathlib import Path
 import json
 import time
 import pandas as pd
+import logging
 from datetime import datetime, timedelta
 
 # SPIKEINTERFACE
@@ -78,7 +79,7 @@ if __name__ == "__main__":
     N_JOBS = int(N_JOBS_CO) if N_JOBS_CO is not None else N_JOBS
 
     if PARAMS_FILE is not None:
-        print(f"\nUsing custom parameter file: {PARAMS_FILE}")
+        logging.info(f"\nUsing custom parameter file: {PARAMS_FILE}")
         with open(PARAMS_FILE, "r") as f:
             processing_params = json.load(f)
     elif PARAMS_STR is not None:
@@ -96,13 +97,13 @@ if __name__ == "__main__":
     visualization_params = processing_params["visualization"]
 
     ###### VISUALIZATION #########
-    print("\n\nVISUALIZATION")
+    logging.info("\n\nVISUALIZATION")
     t_visualization_start_all = time.perf_counter()
     datetime_start_visualization = datetime.now()
 
     # check if test
     if (data_folder / "postprocessing_pipeline_output_test").is_dir():
-        print("\n*******************\n**** TEST MODE ****\n*******************\n")
+        logging.info("\n*******************\n**** TEST MODE ****\n*******************\n")
         postprocessed_folder = data_folder / "postprocessing_pipeline_output_test"
         preprocessed_folder = data_folder / "preprocessing_pipeline_output_test"
         curation_folder = data_folder / "curation_pipeline_output_test"
@@ -149,7 +150,7 @@ if __name__ == "__main__":
     else:
         session_name = ecephys_session_folder.name
 
-    print(f"Session name: {session_name}")
+    logging.info(f"Session name: {session_name}")
 
     # check kachery client
     results_fig_folder = results_folder / "visualization"
@@ -163,10 +164,10 @@ if __name__ == "__main__":
         pass
 
     if kachery_client is not None:
-        print(f"Kachery plots enabled")
+        logging.info(f"Kachery plots enabled")
         plot_kachery = True
     else:
-        print(f"Kachery plots disabled. Client not found")
+        logging.info(f"Kachery plots disabled. Client not found")
         plot_kachery = False
 
     # Retrieve recording_names from preprocessed folder
@@ -182,7 +183,7 @@ if __name__ == "__main__":
         with open(job_json_file) as f:
             job_dict = json.load(f)
         job_dicts.append(job_dict)
-    print(f"Found {len(job_dicts)} JSON job files")
+    logging.info(f"Found {len(job_dicts)} JSON job files")
 
     # loop through block-streams
     for recording_name in recording_names:
@@ -203,7 +204,7 @@ if __name__ == "__main__":
         visualization_output_folder = results_folder / f"visualization_{recording_name}"
         visualization_output_folder.mkdir(exist_ok=True)
 
-        print(f"Visualizing recording: {recording_name}")
+        logging.info(f"Visualizing recording: {recording_name}")
 
         with open(preprocessed_json_file, "r") as f:
             preprocessing_vizualization_data = json.load(f)
@@ -211,7 +212,7 @@ if __name__ == "__main__":
         recording_job_dict = None
         for job_dict in job_dicts:
             if recording_name in job_dict["recording_name"]:
-                print("\tFound JSON file associated to recording")
+                logging.info("\tFound JSON file associated to recording")
                 recording_job_dict = job_dict
                 break
 
@@ -239,10 +240,10 @@ if __name__ == "__main__":
                 if skip_times:
                     recording.reset_times()
                 if analyzer.has_extension("spike_locations"):
-                    print(f"\tVisualizing drift maps using spike sorted data")
+                    logging.info(f"\tVisualizing drift maps using spike sorted data")
                     spike_locations_available = True
             except Exception as e:
-                print(f"\tCould not load sorting analyzer or recording for {recording_name}: Error:\n{e}")
+                logging.info(f"\tCould not load sorting analyzer or recording for {recording_name}: Error:\n{e}")
 
         # if spike locations are not available, detect and localize peaks
         if not spike_locations_available:
@@ -250,7 +251,7 @@ if __name__ == "__main__":
             from spikeinterface.sortingcomponents.peak_detection import DetectPeakLocallyExclusive
             from spikeinterface.sortingcomponents.peak_localization import LocalizeCenterOfMass
 
-            print(f"\tVisualizing drift maps using detected peaks (no spike sorting available)")
+            logging.info(f"\tVisualizing drift maps using detected peaks (no spike sorting available)")
             # locally_exclusive + pipeline steps LocalizeCenterOfMass + PeakToPeakFeature
             drift_data = preprocessing_vizualization_data[recording_name]["drift"]
             try:
@@ -276,13 +277,13 @@ if __name__ == "__main__":
                 peaks, peak_locations = run_node_pipeline(
                     recording, nodes=pipeline_nodes, job_kwargs=si.get_global_job_kwargs()
                 )
-                print(f"\t\tDetected {len(peaks)} peaks")
+                logging.info(f"\t\tDetected {len(peaks)} peaks")
                 peak_amps = peaks["amplitude"]
                 if len(peaks) == 0:
-                    print("\t\tNo peaks detected. Skipping drift map")
+                    logging.info("\t\tNo peaks detected. Skipping drift map")
                     skip_drift = True
             except Exception as e:
-                print(f"\t\tCould not load drift recording. Error:\n{e}\nSkipping")
+                logging.info(f"\t\tCould not load drift recording. Error:\n{e}\nSkipping")
                 skip_drift = True
 
         if not skip_drift:
@@ -336,7 +337,7 @@ if __name__ == "__main__":
             # plot motion
             v_motion = None
             if motion_folder.is_dir():
-                print("\tVisualizing motion")
+                logging.info("\tVisualizing motion")
                 motion_info = spre.load_motion_info(motion_folder)
 
                 cmap = visualization_params["motion"]["cmap"]
@@ -369,7 +370,7 @@ if __name__ == "__main__":
                     )
 
         # timeseries
-        print(f"\tVisualizing timeseries")
+        logging.info(f"\tVisualizing timeseries")
         timeseries_tab_items = []
 
         timeseries_data = preprocessing_vizualization_data[recording_name]["timeseries"]
@@ -385,7 +386,7 @@ if __name__ == "__main__":
                 if skip_times:
                     rec.reset_times()
             except Exception as e:
-                print(f"\t\tCould not load layer {layer}. Error:\n{e}\nSkipping")
+                logging.info(f"\t\tCould not load layer {layer}. Error:\n{e}\nSkipping")
                 continue
             chunk = si.get_random_data_chunks(rec)
             max_value = np.quantile(chunk, 0.99) * 1.2
@@ -405,7 +406,7 @@ if __name__ == "__main__":
                     if skip_times:
                         rec.reset_times()
                 except:
-                    print(f"\t\tCould not load layer {layer}. Skipping")
+                    logging.info(f"\t\tCould not load layer {layer}. Skipping")
                     continue
                 chunk = si.get_random_data_chunks(rec)
                 max_value = np.quantile(chunk, 0.99) * 1.2
@@ -417,7 +418,7 @@ if __name__ == "__main__":
                         rec.set_times(times, segment_index=segment_index, with_warning=False)
                 recording_proc_loaded[layer] = rec
         else:
-            print(f"\tPreprocessed timeseries not avaliable")
+            logging.info(f"\tPreprocessed timeseries not avaliable")
 
         fs = recording.sampling_frequency
         n_snippets_per_seg = visualization_params["timeseries"]["n_snippets_per_segment"]
@@ -489,7 +490,7 @@ if __name__ == "__main__":
                         )
                         timeseries_tab_items.append(v_item)
                     except Exception as e:
-                        print(
+                        logging.info(
                             f"\t\tError plotting traces with SortingView for "
                             f"{recording_name} - {segment_index} - {time_range}:\n\t\tError: {e}"
                         )
@@ -546,17 +547,17 @@ if __name__ == "__main__":
             v_timeseries = vv.TabLayout(items=timeseries_tab_items)
             try:
                 url = v_timeseries.url(label=f"{session_name} - {recording_name}")
-                print(f"\n{url}\n")
+                logging.info(f"\n{url}\n")
                 visualization_output["timeseries"] = url
             except Exception as e:
-                print(f"Figurl-Sortingview plotting error: {e}")
+                logging.info(f"Figurl-Sortingview plotting error: {e}")
 
         # sorting summary
         skip_sorting_summary = True
         if analyzer_folder is not None:
             try:
                 analyzer = si.load_sorting_analyzer(analyzer_folder)
-                print(f"\tVisualizing sorting summary")
+                logging.info(f"\tVisualizing sorting summary")
                 skip_sorting_summary = False
             except:
                 pass
@@ -591,7 +592,7 @@ if __name__ == "__main__":
                     analyzer.sorting.set_property("decoder_prob", decoder_prob)
                     unit_table_properties.append("decoder_prob")
                 else:
-                    print(f"\t\tCould not load unit classification data for {recording_name}")
+                    logging.info(f"\t\tCould not load unit classification data for {recording_name}")
 
             # retrieve sorter name (if spike sorting was performed)
             data_process_spikesorting_json = spikesorted_folder / f"data_process_spikesorting_{recording_name}.json"
@@ -638,17 +639,17 @@ if __name__ == "__main__":
                         url = v_summary.url(
                             label=f"{session_name} - {recording_name} - {sorter_name} - Sorting Summary", state=state
                         )
-                        print(f"\n{url}\n")
+                        logging.info(f"\n{url}\n")
                         visualization_output["sorting_summary"] = url
 
                     except Exception as e:
-                        print("KCL error", e)
+                        logging.info("KCL error", e)
                 else:
-                    print("\tSkipping sorting summary visualization for {recording_name}. Kachery client not found.")
+                    logging.info("\tSkipping sorting summary visualization for {recording_name}. Kachery client not found.")
             else:
-                print("\tSkipping sorting summary visualization for {recording_name}. No units after curation.")
+                logging.info("\tSkipping sorting summary visualization for {recording_name}. No units after curation.")
         else:
-            print(f"\tSkipping sorting summary visualization for {recording_name}. No sorting information available.")
+            logging.info(f"\tSkipping sorting summary visualization for {recording_name}. No sorting information available.")
 
         # save params in output
         visualization_notes = json.dumps(visualization_output, indent=4)
@@ -684,4 +685,4 @@ if __name__ == "__main__":
     t_visualization_end_all = time.perf_counter()
     elapsed_time_visualization_all = np.round(t_visualization_end_all - t_visualization_start_all, 2)
 
-    print(f"VISUALIZATION time: {elapsed_time_visualization_all}s")
+    logging.info(f"VISUALIZATION time: {elapsed_time_visualization_all}s")
