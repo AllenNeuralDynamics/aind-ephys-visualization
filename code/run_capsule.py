@@ -29,6 +29,12 @@ import kachery_cloud as kcl
 # AIND
 from aind_data_schema.core.processing import DataProcess
 
+try:
+    from aind_log_utils import log
+
+    HAVE_AIND_LOG_UTILS = True
+except ImportError:
+    HAVE_AIND_LOG_UTILS = False
 
 URL = "https://github.com/AllenNeuralDynamics/aind-ephys-visualization"
 VERSION = "1.0"
@@ -112,17 +118,36 @@ if __name__ == "__main__":
 
     ecephys_sessions = [p for p in data_folder.iterdir() if "ecephys" in p.name.lower()]
     assert len(ecephys_sessions) == 1, f"Attach one session at a time {ecephys_sessions}"
-    session_folder = ecephys_sessions[0]
+    ecephys_session_folder = ecephys_sessions[0]
+    if HAVE_AIND_LOG_UTILS:
+        # look for subject.json and data_description.json files
+        subject_json = ecephys_session_folder / "subject.json"
+        subject_id = "undefined"
+        if subject_json.is_file():
+            subject_data = json.load(open(subject_json, "r"))
+            subject_id = subject_data["subject_id"]
+
+        data_description_json = ecephys_session_folder / "data_description.json"
+        session_name = "undefined"
+        if data_description_json.is_file():
+            data_description = json.load(open(data_description_json, "r"))
+            session_name = data_description["name"]
+
+        log.setup_logging(
+            "Job Dispatch Ecephys",
+            mouse_id=subject_id,
+            session_name=session_name,
+        )
 
     # in pipeline the ephys folder is renames 'ecephys_session'
     # in this case, grab session name from data_description (if it exists)
-    data_description_file = session_folder / "data_description.json"
+    data_description_file = ecephys_session_folder / "data_description.json"
     if data_description_file.is_file():
         with open(data_description_file, "r") as f:
             data_description_dict = json.load(f)
         session_name = data_description_dict["name"]
     else:
-        session_name = session_folder.name
+        session_name = ecephys_session_folder.name
 
     print(f"Session name: {session_name}")
 
