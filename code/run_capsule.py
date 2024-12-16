@@ -134,7 +134,7 @@ if __name__ == "__main__":
             session_name = data_description["name"]
 
         log.setup_logging(
-            "Job Dispatch Ecephys",
+            "Visualize Ecephys",
             mouse_id=subject_id,
             session_name=session_name,
         )
