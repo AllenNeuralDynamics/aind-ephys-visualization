@@ -243,7 +243,7 @@ if __name__ == "__main__":
                     logging.info(f"\tVisualizing drift maps using spike sorted data")
                     spike_locations_available = True
             except Exception as e:
-                logging.info(f"\tCould not load sorting analyzer or recording for {recording_name}: Error:\n{e}")
+                logging.info(f"\tCould not load sorting analyzer or recording for {recording_name}.")
 
         # if spike locations are not available, detect and localize peaks
         if not spike_locations_available:
@@ -283,7 +283,7 @@ if __name__ == "__main__":
                     logging.info("\t\tNo peaks detected. Skipping drift map")
                     skip_drift = True
             except Exception as e:
-                logging.info(f"\t\tCould not load drift recording. Error:\n{e}\nSkipping")
+                logging.info(f"\t\tCould not load drift recording. Skipping")
                 skip_drift = True
 
         if not skip_drift:
@@ -386,7 +386,7 @@ if __name__ == "__main__":
                 if skip_times:
                     rec.reset_times()
             except Exception as e:
-                logging.info(f"\t\tCould not load layer {layer}. Error:\n{e}\nSkipping")
+                logging.info(f"\t\tCould not load layer {layer}. Skipping")
                 continue
             chunk = si.get_random_data_chunks(rec)
             max_value = np.quantile(chunk, 0.99) * 1.2
@@ -492,7 +492,7 @@ if __name__ == "__main__":
                     except Exception as e:
                         logging.info(
                             f"\t\tError plotting traces with SortingView for "
-                            f"{recording_name} - {segment_index} - {time_range}:\n\t\tError: {e}"
+                            f"{recording_name} - {segment_index} - {time_range}."
                         )
 
                 for i_l, (layer, rec) in enumerate(recording_full_loaded.items()):
@@ -550,7 +550,7 @@ if __name__ == "__main__":
                 logging.info(f"\n{url}\n")
                 visualization_output["timeseries"] = url
             except Exception as e:
-                logging.info(f"Figurl-Sortingview plotting error: {e}")
+                logging.info(f"Figurl-Sortingview plotting error.")
 
         # sorting summary
         skip_sorting_summary = True
