@@ -78,6 +78,31 @@ if __name__ == "__main__":
     N_JOBS_CO = os.getenv("CO_CPUS")
     N_JOBS = int(N_JOBS_CO) if N_JOBS_CO is not None else N_JOBS
 
+    ecephys_sessions = [p for p in data_folder.iterdir() if "ecephys" in p.name.lower()]
+    assert len(ecephys_sessions) == 1, f"Attach one session at a time {ecephys_sessions}"
+    ecephys_session_folder = ecephys_sessions[0]
+    if HAVE_AIND_LOG_UTILS:
+        # look for subject.json and data_description.json files
+        subject_json = ecephys_session_folder / "subject.json"
+        subject_id = "undefined"
+        if subject_json.is_file():
+            subject_data = json.load(open(subject_json, "r"))
+            subject_id = subject_data["subject_id"]
+
+        data_description_json = ecephys_session_folder / "data_description.json"
+        session_name = "undefined"
+        if data_description_json.is_file():
+            data_description = json.load(open(data_description_json, "r"))
+            session_name = data_description["name"]
+
+        log.setup_logging(
+            "Visualize Ecephys",
+            mouse_id=subject_id,
+            session_name=session_name,
+        )
+    else:
+        logging.basicConfig(level=logging.INFO, format="%(message)s")
+
     if PARAMS_FILE is not None:
         logging.info(f"\nUsing custom parameter file: {PARAMS_FILE}")
         with open(PARAMS_FILE, "r") as f:
@@ -116,29 +141,6 @@ if __name__ == "__main__":
         unit_classifier_folder = data_folder
         spikesorted_folder = data_folder
         data_processes_spikesorting_folder = data_folder
-
-    ecephys_sessions = [p for p in data_folder.iterdir() if "ecephys" in p.name.lower()]
-    assert len(ecephys_sessions) == 1, f"Attach one session at a time {ecephys_sessions}"
-    ecephys_session_folder = ecephys_sessions[0]
-    if HAVE_AIND_LOG_UTILS:
-        # look for subject.json and data_description.json files
-        subject_json = ecephys_session_folder / "subject.json"
-        subject_id = "undefined"
-        if subject_json.is_file():
-            subject_data = json.load(open(subject_json, "r"))
-            subject_id = subject_data["subject_id"]
-
-        data_description_json = ecephys_session_folder / "data_description.json"
-        session_name = "undefined"
-        if data_description_json.is_file():
-            data_description = json.load(open(data_description_json, "r"))
-            session_name = data_description["name"]
-
-        log.setup_logging(
-            "Visualize Ecephys",
-            mouse_id=subject_id,
-            session_name=session_name,
-        )
 
     # in pipeline the ephys folder is renames 'ecephys_session'
     # in this case, grab session name from data_description (if it exists)
