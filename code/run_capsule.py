@@ -645,7 +645,7 @@ if __name__ == "__main__":
                         visualization_output["sorting_summary"] = url
 
                     except Exception as e:
-                        logging.info("KCL error", e)
+                        logging.info("\tSortingview plotting resulted in an error")
                 else:
                     logging.info("\tSkipping sorting summary visualization for {recording_name}. Kachery client not found.")
             else:
