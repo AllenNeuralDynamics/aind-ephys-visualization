@@ -155,9 +155,6 @@ if __name__ == "__main__":
     logging.info(f"Session name: {session_name}")
 
     # check kachery client
-    results_fig_folder = results_folder / "visualization"
-    results_fig_folder.mkdir(exist_ok=True)
-
     kachery_client = None
     # further protection against kachery-cloud throwing errors
     try:
@@ -424,9 +421,6 @@ if __name__ == "__main__":
 
         fs = recording.sampling_frequency
         n_snippets_per_seg = visualization_params["timeseries"]["n_snippets_per_segment"]
-
-        fig_traces_folder = results_fig_folder / "traces"
-        fig_traces_folder.mkdir(exist_ok=True)
 
         max_full_layers = len(recording_full_dict)
         max_proc_layers = len(recording_proc_dict) if recording_proc_dict is not None else 0
