@@ -4,6 +4,7 @@ warnings.filterwarnings("ignore")
 
 # GENERAL IMPORTS
 import argparse
+import sys
 import os
 import numpy as np
 from pathlib import Path
@@ -97,11 +98,11 @@ if __name__ == "__main__":
 
         log.setup_logging(
             "Visualize Ecephys",
-            mouse_id=subject_id,
-            session_name=session_name,
+            subject_id=subject_id,
+            asset_name=session_name,
         )
     else:
-        logging.basicConfig(level=logging.INFO, format="%(message)s")
+        logging.basicConfig(level=logging.INFO, stream=sys.stdout, format="%(message)s")
 
     if PARAMS_FILE is not None:
         logging.info(f"\nUsing custom parameter file: {PARAMS_FILE}")

@@ -1,4 +1,4 @@
-# hash:sha256:ec6db904f44d1ae607d73705fee6765587de2d14b2099a8b7f2da6b80a10b92b
+# hash:sha256:866ad697c0a92241d7e9c5d97ce1dd1e8c5ac574c6d7d75c5be42cc146652863
 ARG REGISTRY_HOST
 FROM $REGISTRY_HOST/codeocean/jupyterlab:3.6.1-miniconda4.12.0-python3.9-ubuntu20.04
 
@@ -25,7 +25,7 @@ RUN apt-get update \
 
 RUN pip install -U --no-cache-dir \
     aind-data-schema==1.0.0 \
-    aind-log-utils==0.2.1 \
+    aind-log-utils==0.2.3 \
     pyvips==2.2.1 \
     spikeinterface[full,widgets]==0.101.2 \
     wavpack-numcodecs==0.2.1
