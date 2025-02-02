@@ -533,13 +533,14 @@ if __name__ == "__main__":
                 fig_ts_proc.savefig(visualization_output_folder / f"traces_proc_seg{segment_index}.png", dpi=300)
 
         if plot_kachery:
-            # add drift map
-            if v_drift is not None:
-                timeseries_tab_items.append(v_drift)
+            if not skip_drift:
+                # add drift map if available
+                if v_drift is not None:
+                    timeseries_tab_items.append(v_drift)
 
-            # add motion if available
-            if v_motion is not None:
-                timeseries_tab_items.append(v_motion)
+                # add motion if available
+                if v_motion is not None:
+                    timeseries_tab_items.append(v_motion)
 
             v_timeseries = vv.TabLayout(items=timeseries_tab_items)
             try:
