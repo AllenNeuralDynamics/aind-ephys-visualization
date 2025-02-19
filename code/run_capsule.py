@@ -338,7 +338,7 @@ if __name__ == "__main__":
             v_motion = None
             if motion_folder.is_dir():
                 logging.info("\tVisualizing motion")
-                motion_info = si.load(motion_folder)
+                motion_info = spre.load_motion_info(motion_folder)
 
                 cmap = visualization_params["motion"]["cmap"]
                 scatter_decimate = visualization_params["motion"]["scatter_decimate"]
