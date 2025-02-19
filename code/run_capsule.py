@@ -233,10 +233,10 @@ if __name__ == "__main__":
 
         if analyzer_folder is not None:
             try:
-                analyzer = si.load_sorting_analyzer(analyzer_folder)
+                analyzer = si.load(analyzer_folder)
                 # here recording_folder MUST exist
                 assert recording_folder.is_dir(), f"Recording folder {recording_folder} does not exist"
-                recording = si.load_extractor(recording_folder)
+                recording = si.load(recording_folder)
                 if skip_times:
                     recording.reset_times()
                 if analyzer.has_extension("spike_locations"):
@@ -255,7 +255,7 @@ if __name__ == "__main__":
             # locally_exclusive + pipeline steps LocalizeCenterOfMass + PeakToPeakFeature
             drift_data = preprocessing_vizualization_data[recording_name]["drift"]
             try:
-                recording = si.load_extractor(drift_data["recording"], base_folder=preprocessed_folder)
+                recording = si.load(drift_data["recording"], base_folder=preprocessed_folder)
                 if skip_times:
                     recording.reset_times()
 
@@ -338,7 +338,7 @@ if __name__ == "__main__":
             v_motion = None
             if motion_folder.is_dir():
                 logging.info("\tVisualizing motion")
-                motion_info = spre.load_motion_info(motion_folder)
+                motion_info = si.load(motion_folder)
 
                 cmap = visualization_params["motion"]["cmap"]
                 scatter_decimate = visualization_params["motion"]["scatter_decimate"]
@@ -382,7 +382,7 @@ if __name__ == "__main__":
         recording_full_loaded = {}
         for layer, rec_dict in recording_full_dict.items():
             try:
-                rec = si.load_extractor(rec_dict, base_folder=data_folder)
+                rec = si.load(rec_dict, base_folder=data_folder)
                 if skip_times:
                     rec.reset_times()
             except Exception as e:
@@ -402,7 +402,7 @@ if __name__ == "__main__":
             recording_proc_loaded = {}
             for layer, rec_dict in recording_proc_dict.items():
                 try:
-                    rec = si.load_extractor(rec_dict, base_folder=data_folder)
+                    rec = si.load(rec_dict, base_folder=data_folder)
                     if skip_times:
                         rec.reset_times()
                 except:
@@ -554,7 +554,7 @@ if __name__ == "__main__":
         skip_sorting_summary = True
         if analyzer_folder is not None:
             try:
-                analyzer = si.load_sorting_analyzer(analyzer_folder)
+                analyzer = si.load(analyzer_folder)
                 logging.info(f"\tVisualizing sorting summary")
                 skip_sorting_summary = False
             except:
