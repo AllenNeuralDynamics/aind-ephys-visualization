@@ -226,6 +226,7 @@ if __name__ == "__main__":
         spike_locations_available = False
         # use spike locations
         analyzer_folder = None
+        analyzer = None
         if analyzer_binary_folder.is_dir():
             analyzer_folder = analyzer_binary_folder
         elif analyzer_zarr_folder.is_dir():
@@ -233,10 +234,10 @@ if __name__ == "__main__":
 
         if analyzer_folder is not None:
             try:
-                analyzer = si.load(analyzer_folder)
                 # here recording_folder MUST exist
                 assert recording_folder.is_dir(), f"Recording folder {recording_folder} does not exist"
                 recording = si.load(recording_folder)
+                analyzer = si.load(analyzer_folder, load_extensions=False)
                 if skip_times:
                     recording.reset_times()
                 if analyzer.has_extension("spike_locations"):
@@ -552,31 +553,29 @@ if __name__ == "__main__":
 
         # sorting summary
         skip_sorting_summary = True
-        if analyzer_folder is not None:
-            try:
-                analyzer = si.load(analyzer_folder)
-                logging.info(f"\tVisualizing sorting summary")
-                skip_sorting_summary = False
-            except:
-                pass
+        if analyzer is not None:
+            logging.info(f"\tVisualizing sorting summary")
+            skip_sorting_summary = False
 
         if not skip_sorting_summary:
-            unit_table_properties = []
-            # add firing rate and amplitude columns
+            displayed_unit_properties = []
+            extra_unit_properties = {}
+            # add firing rate, snr, and amplitude columns
             if analyzer.has_extension("quality_metrics"):
                 qm = analyzer.get_extension("quality_metrics").get_data()
-                unit_table_properties.append("firing_rate")
+                if "firing_rate" in qm.columns:
+                    displayed_unit_properties.append("firing_rate")
+                if "snr" in qm.columns:
+                    displayed_unit_properties.append("snr")
 
             amplitudes = si.get_template_extremum_amplitude(analyzer, mode="peak_to_peak")
-            analyzer.sorting.set_property("amplitude", list(amplitudes.values()))
-            unit_table_properties.append("amplitude")
+            extra_unit_properties["amplitude"] = np.array(list(amplitudes.values()))
 
             # add curation column
             if qc_file.is_file():
                 # add qc property to analyzer sorting
                 default_qc = np.load(qc_file)
-                analyzer.sorting.set_property("default_qc", default_qc)
-                unit_table_properties.append("default_qc")
+                extra_unit_properties["default_qc"] = default_qc
 
             # add noise decoder column
             if unit_classifier_file.is_file():
@@ -584,11 +583,9 @@ if __name__ == "__main__":
                 unit_classifier_df = pd.read_csv(unit_classifier_file, index_col=False)
                 if len(unit_classifier_df) == len(analyzer.unit_ids):
                     decoder_label = unit_classifier_df["decoder_label"]
-                    analyzer.sorting.set_property("decoder_label", decoder_label)
-                    unit_table_properties.append("decoder_label")
+                    extra_unit_properties["decoder_label"] = decoder_label.values.astype(str)
                     decoder_prob = np.round(unit_classifier_df["decoder_probability"], 2)
-                    analyzer.sorting.set_property("decoder_prob", decoder_prob)
-                    unit_table_properties.append("decoder_prob")
+                    extra_unit_properties["decoder_prob"] = decoder_prob.values
                 else:
                     logging.info(f"\t\tCould not load unit classification data for {recording_name}")
 
@@ -613,7 +610,8 @@ if __name__ == "__main__":
                     ).view
                     v_sorting = sw.plot_sorting_summary(
                         analyzer,
-                        unit_table_properties=unit_table_properties,
+                        displayed_unit_properties=displayed_unit_properties,
+                        extra_unit_properties=extra_unit_properties,
                         curation=True,
                         label_choices=LABEL_CHOICES,
                         backend="sortingview",
