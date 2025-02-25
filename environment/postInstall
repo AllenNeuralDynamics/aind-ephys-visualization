@@ -2,8 +2,8 @@
 set -e
 
 # fix bug with SortingView string columns
-git clone https://github.com/alejoe91/spikeinterface.git
+git clone https://github.com/SpikeInterface/spikeinterface.git
 cd spikeinterface
-git checkout 6b8e77e3b6d2ed7be41060ad85c0d14e3551f668
+git checkout 2c6e800a820aa0618007018b94a047f71f82ace5
 pip install .[full,widgets]
 cd ..
