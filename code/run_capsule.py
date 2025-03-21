@@ -26,7 +26,6 @@ import spikeinterface.qualitymetrics as sqm
 # VIZ
 import matplotlib.pyplot as plt
 import sortingview.views as vv
-import kachery_cloud as kcl
 
 # AIND
 from aind_data_schema.core.processing import DataProcess
