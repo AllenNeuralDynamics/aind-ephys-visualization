@@ -1,4 +1,4 @@
-# hash:sha256:b47a96086829f0a6d5a565eadc0035441d1f7f07025d4bf2ffdf9bd3f0581316
+# hash:sha256:2946e327346aff828e6ad80e3f4aecedf85596c51e56f67667f70443c1ec04e3
 ARG REGISTRY_HOST
 FROM $REGISTRY_HOST/codeocean/jupyterlab:3.6.1-miniconda4.12.0-python3.9-ubuntu20.04
 
@@ -14,6 +14,8 @@ ARG GIT_ASKPASS
 ARG GIT_ACCESS_TOKEN
 COPY git-askpass /
 
+ENV GH_CURATION_REPO=gh://AllenNeuralDynamics/ephys-sorting-manual-curation/main
+
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         fonts-freefont-ttf=20120503-10 \
@@ -22,10 +24,11 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 RUN pip install -U --no-cache-dir \
-    aind-data-schema==1.0.0 \
+    aind-data-schema==1.3.0 \
+    aind-log-utils==0.2.3 \
     pyvips==2.2.1 \
-    spikeinterface[full,widgets]==0.101.1 \
-    wavpack-numcodecs==0.2.1
+    spikeinterface[full,widgets]==0.102.1 \
+    wavpack-numcodecs==0.2.2
 
 COPY postInstall /
 RUN /postInstall

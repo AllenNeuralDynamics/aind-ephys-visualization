@@ -4,12 +4,14 @@ warnings.filterwarnings("ignore")
 
 # GENERAL IMPORTS
 import argparse
+import sys
 import os
 import numpy as np
 from pathlib import Path
 import json
 import time
 import pandas as pd
+import logging
 from datetime import datetime, timedelta
 
 # SPIKEINTERFACE
@@ -23,17 +25,23 @@ import spikeinterface.qualitymetrics as sqm
 
 # VIZ
 import matplotlib.pyplot as plt
-from matplotlib.colors import Normalize
 import sortingview.views as vv
+import kachery_cloud as kcl
 
 # AIND
 from aind_data_schema.core.processing import DataProcess
 
+try:
+    from aind_log_utils import log
+
+    HAVE_AIND_LOG_UTILS = True
+except ImportError:
+    HAVE_AIND_LOG_UTILS = False
 
 URL = "https://github.com/AllenNeuralDynamics/aind-ephys-visualization"
 VERSION = "1.0"
 
-GH_CURATION_REPO = "gh://AllenNeuralDynamics/ephys-sorting-manual-curation/main"
+GH_CURATION_REPO = os.getenv("GH_CURATION_REPO")
 LABEL_CHOICES = ["noise", "MUA", "SUA", "pMUA", "pSUA"]
 
 data_folder = Path("../data/")
@@ -71,8 +79,33 @@ if __name__ == "__main__":
     N_JOBS_CO = os.getenv("CO_CPUS")
     N_JOBS = int(N_JOBS_CO) if N_JOBS_CO is not None else N_JOBS
 
+    ecephys_sessions = [p for p in data_folder.iterdir() if "ecephys" in p.name.lower()]
+    assert len(ecephys_sessions) == 1, f"Attach one session at a time {ecephys_sessions}"
+    ecephys_session_folder = ecephys_sessions[0]
+    if HAVE_AIND_LOG_UTILS:
+        # look for subject.json and data_description.json files
+        subject_json = ecephys_session_folder / "subject.json"
+        subject_id = "undefined"
+        if subject_json.is_file():
+            subject_data = json.load(open(subject_json, "r"))
+            subject_id = subject_data["subject_id"]
+
+        data_description_json = ecephys_session_folder / "data_description.json"
+        session_name = "undefined"
+        if data_description_json.is_file():
+            data_description = json.load(open(data_description_json, "r"))
+            session_name = data_description["name"]
+
+        log.setup_logging(
+            "Visualize Ecephys",
+            subject_id=subject_id,
+            asset_name=session_name,
+        )
+    else:
+        logging.basicConfig(level=logging.INFO, stream=sys.stdout, format="%(message)s")
+
     if PARAMS_FILE is not None:
-        print(f"\nUsing custom parameter file: {PARAMS_FILE}")
+        logging.info(f"\nUsing custom parameter file: {PARAMS_FILE}")
         with open(PARAMS_FILE, "r") as f:
             processing_params = json.load(f)
     elif PARAMS_STR is not None:
@@ -90,13 +123,13 @@ if __name__ == "__main__":
     visualization_params = processing_params["visualization"]
 
     ###### VISUALIZATION #########
-    print("\n\nVISUALIZATION")
+    logging.info("\n\nVISUALIZATION")
     t_visualization_start_all = time.perf_counter()
     datetime_start_visualization = datetime.now()
 
     # check if test
     if (data_folder / "postprocessing_pipeline_output_test").is_dir():
-        print("\n*******************\n**** TEST MODE ****\n*******************\n")
+        logging.info("\n*******************\n**** TEST MODE ****\n*******************\n")
         postprocessed_folder = data_folder / "postprocessing_pipeline_output_test"
         preprocessed_folder = data_folder / "preprocessing_pipeline_output_test"
         curation_folder = data_folder / "curation_pipeline_output_test"
@@ -110,21 +143,32 @@ if __name__ == "__main__":
         spikesorted_folder = data_folder
         data_processes_spikesorting_folder = data_folder
 
-    ecephys_sessions = [p for p in data_folder.iterdir() if "ecephys" in p.name.lower()]
-    assert len(ecephys_sessions) == 1, f"Attach one session at a time {ecephys_sessions}"
-    session_folder = ecephys_sessions[0]
-
     # in pipeline the ephys folder is renames 'ecephys_session'
     # in this case, grab session name from data_description (if it exists)
-    data_description_file = session_folder / "data_description.json"
+    data_description_file = ecephys_session_folder / "data_description.json"
     if data_description_file.is_file():
         with open(data_description_file, "r") as f:
             data_description_dict = json.load(f)
         session_name = data_description_dict["name"]
     else:
-        session_name = session_folder.name
+        session_name = ecephys_session_folder.name
 
-    print(f"Session name: {session_name}")
+    logging.info(f"Session name: {session_name}")
+
+    # check kachery client
+    kachery_client = None
+    # further protection against kachery-cloud throwing errors
+    try:
+        kachery_client = kcl.get_client_info()
+    except:
+        pass
+
+    if kachery_client is not None:
+        logging.info(f"Kachery plots enabled")
+        plot_kachery = True
+    else:
+        logging.info(f"Kachery plots disabled. Client not found")
+        plot_kachery = False
 
     # Retrieve recording_names from preprocessed folder
     recording_names = [
@@ -139,7 +183,7 @@ if __name__ == "__main__":
         with open(job_json_file) as f:
             job_dict = json.load(f)
         job_dicts.append(job_dict)
-    print(f"Found {len(job_dicts)} JSON job files")
+    logging.info(f"Found {len(job_dicts)} JSON job files")
 
     # loop through block-streams
     for recording_name in recording_names:
@@ -157,8 +201,10 @@ if __name__ == "__main__":
         visualization_output_process_json = results_folder / f"{data_process_prefix}_{recording_name}.json"
         # save vizualization output
         visualization_output_file = results_folder / f"visualization_{recording_name}.json"
+        visualization_output_folder = results_folder / f"visualization_{recording_name}"
+        visualization_output_folder.mkdir(exist_ok=True)
 
-        print(f"Visualizing recording: {recording_name}")
+        logging.info(f"Visualizing recording: {recording_name}")
 
         with open(preprocessed_json_file, "r") as f:
             preprocessing_vizualization_data = json.load(f)
@@ -166,7 +212,7 @@ if __name__ == "__main__":
         recording_job_dict = None
         for job_dict in job_dicts:
             if recording_name in job_dict["recording_name"]:
-                print("\tFound JSON file associated to recording")
+                logging.info("\tFound JSON file associated to recording")
                 recording_job_dict = job_dict
                 break
 
@@ -180,6 +226,7 @@ if __name__ == "__main__":
         spike_locations_available = False
         # use spike locations
         analyzer_folder = None
+        analyzer = None
         if analyzer_binary_folder.is_dir():
             analyzer_folder = analyzer_binary_folder
         elif analyzer_zarr_folder.is_dir():
@@ -187,19 +234,17 @@ if __name__ == "__main__":
 
         if analyzer_folder is not None:
             try:
-                analyzer = si.load_sorting_analyzer(analyzer_folder)
                 # here recording_folder MUST exist
                 assert recording_folder.is_dir(), f"Recording folder {recording_folder} does not exist"
-                recording = si.load_extractor(recording_folder)
+                recording = si.load(recording_folder)
+                analyzer = si.load(analyzer_folder, load_extensions=False)
                 if skip_times:
                     recording.reset_times()
                 if analyzer.has_extension("spike_locations"):
-                    print(f"\tVisualizing drift maps using spike sorted data")
+                    logging.info(f"\tVisualizing drift maps using spike sorted data")
                     spike_locations_available = True
             except Exception as e:
-                print(
-                    f"\tCould not load sorting analyzer or recording for {recording_name}: Error:\n{e}"
-                )
+                logging.info(f"\tCould not load sorting analyzer or recording for {recording_name}.")
 
         # if spike locations are not available, detect and localize peaks
         if not spike_locations_available:
@@ -207,11 +252,11 @@ if __name__ == "__main__":
             from spikeinterface.sortingcomponents.peak_detection import DetectPeakLocallyExclusive
             from spikeinterface.sortingcomponents.peak_localization import LocalizeCenterOfMass
 
-            print(f"\tVisualizing drift maps using detected peaks (no spike sorting available)")
+            logging.info(f"\tVisualizing drift maps using detected peaks (no spike sorting available)")
             # locally_exclusive + pipeline steps LocalizeCenterOfMass + PeakToPeakFeature
             drift_data = preprocessing_vizualization_data[recording_name]["drift"]
             try:
-                recording = si.load_extractor(drift_data["recording"], base_folder=preprocessed_folder)
+                recording = si.load(drift_data["recording"], base_folder=preprocessed_folder)
                 if skip_times:
                     recording.reset_times()
 
@@ -233,13 +278,13 @@ if __name__ == "__main__":
                 peaks, peak_locations = run_node_pipeline(
                     recording, nodes=pipeline_nodes, job_kwargs=si.get_global_job_kwargs()
                 )
-                print(f"\t\tDetected {len(peaks)} peaks")
+                logging.info(f"\t\tDetected {len(peaks)} peaks")
                 peak_amps = peaks["amplitude"]
                 if len(peaks) == 0:
-                    print("\t\tNo peaks detected. Skipping drift map")
+                    logging.info("\t\tNo peaks detected. Skipping drift map")
                     skip_drift = True
             except Exception as e:
-                print(f"\t\tCould not load drift recording. Error:\n{e}\nSkipping")
+                logging.info(f"\t\tCould not load drift recording. Skipping")
                 skip_drift = True
 
         if not skip_drift:
@@ -276,24 +321,24 @@ if __name__ == "__main__":
                     cmap=visualization_params["drift"]["cmap"],
                     scatter_decimate=visualization_params["drift"]["n_skip"],
                     alpha=visualization_params["drift"]["alpha"],
-                    ax=ax_drift
+                    ax=ax_drift,
                 )
                 ax_drift.spines["top"].set_visible(False)
                 ax_drift.spines["right"].set_visible(False)
 
-            fig_drift_folder = scratch_folder / "drift_maps"
-            fig_drift_folder.mkdir(exist_ok=True)
-            fig_drift.savefig(fig_drift_folder / f"{recording_name}_drift.png", dpi=300)
+            fig_drift.savefig(visualization_output_folder / "drift_map.png", dpi=300)
 
             # make a sorting view View
-            v_drift = vv.TabLayoutItem(
-                label=f"Drift map", view=vv.Image(image_path=str(fig_drift_folder / f"{recording_name}_drift.png"))
-            )
+            v_drift = None
+            if plot_kachery:
+                v_drift = vv.TabLayoutItem(
+                    label=f"Drift map", view=vv.Image(image_path=str(visualization_output_folder / "drift_map.png"))
+                )
 
             # plot motion
             v_motion = None
             if motion_folder.is_dir():
-                print("\tVisualizing motion")
+                logging.info("\tVisualizing motion")
                 motion_info = spre.load_motion_info(motion_folder)
 
                 cmap = visualization_params["motion"]["cmap"]
@@ -315,17 +360,19 @@ if __name__ == "__main__":
                     amplitude_cmap=cmap,
                     scatter_decimate=scatter_decimate,
                 )
-                fig_motion.savefig(fig_drift_folder / f"{recording_name}_motion.png", dpi=300)
+
+                fig_motion.savefig(visualization_output_folder / "motion.png", dpi=300)
 
                 # make a sorting view View
-                v_motion = vv.TabLayoutItem(
-                    label=f"Motion",
-                    view=vv.Image(image_path=str(fig_drift_folder / f"{recording_name}_motion.png")),
-                )
+                if plot_kachery:
+                    v_motion = vv.TabLayoutItem(
+                        label=f"Motion",
+                        view=vv.Image(image_path=str(visualization_output_folder / "motion.png")),
+                    )
 
         # timeseries
+        logging.info(f"\tVisualizing timeseries")
         timeseries_tab_items = []
-        print(f"\tVisualizing timeseries")
 
         timeseries_data = preprocessing_vizualization_data[recording_name]["timeseries"]
         recording_full_dict = timeseries_data["full"]
@@ -336,129 +383,211 @@ if __name__ == "__main__":
         recording_full_loaded = {}
         for layer, rec_dict in recording_full_dict.items():
             try:
-                rec = si.load_extractor(rec_dict, base_folder=data_folder)
+                rec = si.load(rec_dict, base_folder=data_folder)
                 if skip_times:
                     rec.reset_times()
             except Exception as e:
-                print(f"\t\tCould not load layer {layer}. Error:\n{e}\nSkipping")
+                logging.info(f"\t\tCould not load layer {layer}. Skipping")
                 continue
             chunk = si.get_random_data_chunks(rec)
             max_value = np.quantile(chunk, 0.99) * 1.2
             clims_full[layer] = (-max_value, max_value)
+            # explicitly set timestamps if not present
+            for segment_index in range(rec.get_num_segments()):
+                if not rec.has_time_vector(segment_index=segment_index):
+                    times = rec.get_times(segment_index=segment_index)
+                    rec.set_times(times, segment_index=segment_index, with_warning=False)
             recording_full_loaded[layer] = rec
         clims_proc = {}
         if recording_proc_dict is not None:
             recording_proc_loaded = {}
             for layer, rec_dict in recording_proc_dict.items():
                 try:
-                    rec = si.load_extractor(rec_dict, base_folder=data_folder)
+                    rec = si.load(rec_dict, base_folder=data_folder)
                     if skip_times:
                         rec.reset_times()
                 except:
-                    print(f"\t\tCould not load layer {layer}. Skipping")
+                    logging.info(f"\t\tCould not load layer {layer}. Skipping")
                     continue
                 chunk = si.get_random_data_chunks(rec)
                 max_value = np.quantile(chunk, 0.99) * 1.2
                 clims_proc[layer] = (-max_value, max_value)
+                # explicitly set timestamps if not present
+                for segment_index in range(rec.get_num_segments()):
+                    if not rec.has_time_vector(segment_index=segment_index):
+                        times = rec.get_times(segment_index=segment_index)
+                        rec.set_times(times, segment_index=segment_index, with_warning=False)
                 recording_proc_loaded[layer] = rec
         else:
-            print(f"\tPreprocessed timeseries not avaliable")
+            logging.info(f"\tPreprocessed timeseries not avaliable")
 
         fs = recording.sampling_frequency
         n_snippets_per_seg = visualization_params["timeseries"]["n_snippets_per_segment"]
-        # try:
+
+        max_full_layers = len(recording_full_dict)
+        max_proc_layers = len(recording_proc_dict) if recording_proc_dict is not None else 0
+        max_num_layers = max(max_full_layers, max_proc_layers)
+
         for segment_index in range(recording.get_num_segments()):
-            segment_duration = recording.get_num_samples(segment_index) / fs
+            traces_figsize = (int(5 * max_num_layers), int(5 * n_snippets_per_seg))
+            fig_ts, axs_ts = plt.subplots(
+                ncols=n_snippets_per_seg,
+                nrows=max_num_layers,
+                figsize=traces_figsize,
+            )
+            fig_ts.suptitle("Full traces", fontsize=16)
+            fig_ts_proc = None
+            if recording_proc_dict is not None:
+                fig_ts_proc, axs_ts_proc = plt.subplots(
+                    ncols=n_snippets_per_seg,
+                    nrows=max_num_layers,
+                    figsize=traces_figsize,
+                )
+                fig_ts_proc.suptitle("Processed traces", fontsize=16)
+
             # evenly distribute t_starts across segments
-            t_start_segment = recording.get_times(segment_index=segment_index)[0]
-            t_starts = np.linspace(t_start_segment, t_start_segment + segment_duration, n_snippets_per_seg + 2)[1:-1]
-            for t_start in t_starts:
+            times = recording.get_times(segment_index=segment_index)
+            t_starts = np.linspace(times[0], times[-1], n_snippets_per_seg + 2)[1:-1]
+
+            for i_t, t_start in enumerate(t_starts):
                 time_range = np.round(
                     np.array([t_start, t_start + visualization_params["timeseries"]["snippet_duration_s"]]), 1
                 )
-                w_full = sw.plot_traces(
-                    recording_full_loaded,
-                    order_channel_by_depth=True,
-                    time_range=time_range,
-                    segment_index=segment_index,
-                    clim=clims_full,
-                    backend="sortingview",
-                    generate_url=False,
-                )
-                if recording_proc_dict is not None:
-                    w_proc = sw.plot_traces(
-                        recording_proc_loaded,
+                if plot_kachery:
+                    try:
+                        w_full = sw.plot_traces(
+                            recording_full_loaded,
+                            order_channel_by_depth=True,
+                            time_range=time_range,
+                            segment_index=segment_index,
+                            clim=clims_full,
+                            mode="map",
+                            backend="sortingview",
+                            generate_url=False,
+                        )
+                        if recording_proc_dict is not None:
+                            w_proc = sw.plot_traces(
+                                recording_proc_loaded,
+                                order_channel_by_depth=True,
+                                time_range=time_range,
+                                segment_index=segment_index,
+                                clim=clims_proc,
+                                mode="map",
+                                backend="sortingview",
+                                generate_url=False,
+                            )
+                            view = vv.Splitter(
+                                direction="horizontal",
+                                item1=vv.LayoutItem(w_full.view),
+                                item2=vv.LayoutItem(w_proc.view),
+                            )
+                        else:
+                            view = w_full.view
+                        v_item = vv.TabLayoutItem(
+                            label=f"Timeseries - Segment {segment_index} - Time: {time_range}", view=view
+                        )
+                        timeseries_tab_items.append(v_item)
+                    except Exception as e:
+                        logging.info(
+                            f"\t\tError plotting traces with SortingView for "
+                            f"{recording_name} - {segment_index} - {time_range}."
+                        )
+
+                for i_l, (layer, rec) in enumerate(recording_full_loaded.items()):
+                    ax_ts = axs_ts[i_t] if max_num_layers == 1 else axs_ts[i_l, i_t]
+                    sw.plot_traces(
+                        rec,
                         order_channel_by_depth=True,
                         time_range=time_range,
                         segment_index=segment_index,
-                        clim=clims_proc,
-                        backend="sortingview",
-                        generate_url=False,
+                        ax=ax_ts,
+                        clim=clims_full[layer],
+                        backend="matplotlib",
                     )
-                    view = vv.Splitter(
-                        direction="horizontal",
-                        item1=vv.LayoutItem(w_full.view),
-                        item2=vv.LayoutItem(w_proc.view),
-                    )
-                else:
-                    view = w_full.view
-                v_item = vv.TabLayoutItem(
-                    label=f"Timeseries - Segment {segment_index} - Time: {time_range}", view=view
-                )
-                timeseries_tab_items.append(v_item)
-        # add drift map
-        timeseries_tab_items.append(v_drift)
+                    if i_l == 0:
+                        ax_ts.set_title(f"Time: {time_range}\n{layer}")
+                    else:
+                        ax_ts.set_title(f"{layer}")
+                    ax_ts.spines["top"].set_visible(False)
+                    ax_ts.spines["right"].set_visible(False)
+                if recording_proc_dict is not None:
+                    for i_l, (layer, rec) in enumerate(recording_proc_loaded.items()):
+                        ax_ts_proc = axs_ts_proc[i_t] if max_num_layers == 1 else axs_ts_proc[i_l, i_t]
+                        sw.plot_traces(
+                            rec,
+                            order_channel_by_depth=True,
+                            time_range=time_range,
+                            segment_index=segment_index,
+                            ax=ax_ts_proc,
+                            clim=clims_proc[layer],
+                            backend="matplotlib",
+                        )
+                        if i_l == 0:
+                            ax_ts_proc.set_title(f"Time: {time_range}\n{layer}")
+                        else:
+                            ax_ts_proc.set_title(f"{layer}")
+                        ax_ts_proc.spines["top"].set_visible(False)
+                        ax_ts_proc.spines["right"].set_visible(False)
 
-        # add motion if available
-        if v_motion is not None:
-            timeseries_tab_items.append(v_motion)
+            fig_ts.savefig(visualization_output_folder / f"traces_full_seg{segment_index}.png", dpi=300)
+            if fig_ts_proc is not None:
+                fig_ts_proc.savefig(visualization_output_folder / f"traces_proc_seg{segment_index}.png", dpi=300)
 
-        v_timeseries = vv.TabLayout(items=timeseries_tab_items)
-        try:
-            url = v_timeseries.url(label=f"{session_name} - {recording_name}")
-            print(f"\n{url}\n")
-            visualization_output["timeseries"] = url
-        except Exception as e:
-            print(f"Figurl-Sortingview plotting error: {e}")
+        if plot_kachery:
+            if not skip_drift:
+                # add drift map if available
+                if v_drift is not None:
+                    timeseries_tab_items.append(v_drift)
+
+                # add motion if available
+                if v_motion is not None:
+                    timeseries_tab_items.append(v_motion)
+
+            v_timeseries = vv.TabLayout(items=timeseries_tab_items)
+            try:
+                url = v_timeseries.url(label=f"{session_name} - {recording_name}")
+                logging.info(f"\n{url}\n")
+                visualization_output["timeseries"] = url
+            except Exception as e:
+                logging.info(f"Figurl-Sortingview plotting error.")
 
         # sorting summary
         skip_sorting_summary = True
-        if analyzer_folder is not None:
-            try:
-                analyzer = si.load_sorting_analyzer(analyzer_folder)
-                print(f"\tVisualizing sorting summary")
-                skip_sorting_summary = False
-            except:
-                pass
+        if analyzer is not None:
+            logging.info(f"\tVisualizing sorting summary")
+            skip_sorting_summary = False
 
         if not skip_sorting_summary:
-            unit_table_properties = []
-            # add firing rate and amplitude columns
+            displayed_unit_properties = []
+            extra_unit_properties = {}
+            # add firing rate, snr, and amplitude columns
             if analyzer.has_extension("quality_metrics"):
                 qm = analyzer.get_extension("quality_metrics").get_data()
-                unit_table_properties.append("firing_rate")
+                if "firing_rate" in qm.columns:
+                    displayed_unit_properties.append("firing_rate")
+                if "snr" in qm.columns:
+                    displayed_unit_properties.append("snr")
 
             amplitudes = si.get_template_extremum_amplitude(analyzer, mode="peak_to_peak")
-            analyzer.sorting.set_property("amplitude", list(amplitudes.values()))
-            unit_table_properties.append("amplitude")
+            extra_unit_properties["amplitude"] = np.array(list(amplitudes.values()))
 
             # add curation column
             if qc_file.is_file():
                 # add qc property to analyzer sorting
                 default_qc = np.load(qc_file)
-                analyzer.sorting.set_property("default_qc", default_qc)
-                unit_table_properties.append("default_qc")
+                extra_unit_properties["default_qc"] = default_qc
 
             # add noise decoder column
             if unit_classifier_file.is_file():
                 # add decoder_label and decoder probability
                 unit_classifier_df = pd.read_csv(unit_classifier_file, index_col=False)
-                decoder_label = unit_classifier_df["decoder_label"]
-                analyzer.sorting.set_property("decoder_label", decoder_label)
-                unit_table_properties.append("decoder_label")
-                decoder_prob = np.round(unit_classifier_df["decoder_probability"], 2)
-                analyzer.sorting.set_property("decoder_prob", decoder_prob)
-                unit_table_properties.append("decoder_prob")
+                if len(unit_classifier_df) == len(analyzer.unit_ids):
+                    decoder_label = unit_classifier_df["decoder_label"]
+                    extra_unit_properties["decoder_label"] = decoder_label.values.astype(str)
+                    decoder_prob = np.round(unit_classifier_df["decoder_probability"], 2)
+                    extra_unit_properties["decoder_prob"] = decoder_prob.values
+                else:
+                    logging.info(f"\t\tCould not load unit classification data for {recording_name}")
 
             # retrieve sorter name (if spike sorting was performed)
             data_process_spikesorting_json = spikesorted_folder / f"data_process_spikesorting_{recording_name}.json"
@@ -470,42 +599,53 @@ if __name__ == "__main__":
                 sorter_name = "unknown"
 
             if len(analyzer.unit_ids) > 0:
-                # tab layout with Summary and Quality Metrics
-                v_qm = sw.plot_quality_metrics(
-                    analyzer,
-                    skip_metrics=["isi_violations_count", "rp_violations"],
-                    include_metrics_data=True,
-                    backend="sortingview",
-                    generate_url=False,
-                ).view
-                v_sorting = sw.plot_sorting_summary(
-                    analyzer, unit_table_properties=unit_table_properties, curation=True, 
-                    label_choices=LABEL_CHOICES, backend="sortingview", generate_url=False
-                ).view
+                if plot_kachery:
+                    # tab layout with Summary and Quality Metrics
+                    v_qm = sw.plot_quality_metrics(
+                        analyzer,
+                        skip_metrics=["isi_violations_count", "rp_violations"],
+                        include_metrics_data=True,
+                        backend="sortingview",
+                        generate_url=False,
+                    ).view
+                    v_sorting = sw.plot_sorting_summary(
+                        analyzer,
+                        displayed_unit_properties=displayed_unit_properties,
+                        extra_unit_properties=extra_unit_properties,
+                        curation=True,
+                        label_choices=LABEL_CHOICES,
+                        backend="sortingview",
+                        generate_url=False,
+                    ).view
 
-                v_summary = vv.TabLayout(
-                    items=[
-                        vv.TabLayoutItem(label="Sorting summary", view=v_sorting),
-                        vv.TabLayoutItem(label="Quality Metrics", view=v_qm),
-                    ]
-                )
-
-                try:
-                    # pre-generate gh for curation
-                    gh_path = f"{GH_CURATION_REPO}/{session_name}/{recording_name}/{sorter_name}/curation.json"
-                    state = dict(sortingCuration=gh_path)
-                    url = v_summary.url(
-                        label=f"{session_name} - {recording_name} - {sorter_name} - Sorting Summary", state=state
+                    v_summary = vv.TabLayout(
+                        items=[
+                            vv.TabLayoutItem(label="Sorting summary", view=v_sorting),
+                            vv.TabLayoutItem(label="Quality Metrics", view=v_qm),
+                        ]
                     )
-                    print(f"\n{url}\n")
-                    visualization_output["sorting_summary"] = url
 
-                except Exception as e:
-                    print("KCL error", e)
+                    try:
+                        # pre-generate gh for curation
+                        if GH_CURATION_REPO is not None:
+                            gh_path = f"{GH_CURATION_REPO}/{session_name}/{recording_name}/{sorter_name}/curation.json"
+                            state = dict(sortingCuration=gh_path)
+                        else:
+                            state = None
+                        url = v_summary.url(
+                            label=f"{session_name} - {recording_name} - {sorter_name} - Sorting Summary", state=state
+                        )
+                        logging.info(f"\n{url}\n")
+                        visualization_output["sorting_summary"] = url
+
+                    except Exception as e:
+                        logging.info("\tSortingview plotting resulted in an error")
+                else:
+                    logging.info("\tSkipping sorting summary visualization for {recording_name}. Kachery client not found.")
             else:
-                print("\tSkipping sorting summary visualization for {recording_name}. No units after curation.")
+                logging.info("\tSkipping sorting summary visualization for {recording_name}. No units after curation.")
         else:
-            print(f"\tSkipping sorting summary visualization for {recording_name}. No sorting information available.")
+            logging.info(f"\tSkipping sorting summary visualization for {recording_name}. No sorting information available.")
 
         # save params in output
         visualization_notes = json.dumps(visualization_output, indent=4)
@@ -513,8 +653,9 @@ if __name__ == "__main__":
         visualization_notes = visualization_notes.replace('\\"', "%22")
         visualization_notes = visualization_notes.replace("#", "%23")
 
-        # remove escape characters
-        visualization_output_file.write_text(visualization_notes)
+        if plot_kachery:
+            # remove escape characters
+            visualization_output_file.write_text(visualization_notes)
 
         # save vizualization output
         t_visualization_end = time.perf_counter()
@@ -540,4 +681,4 @@ if __name__ == "__main__":
     t_visualization_end_all = time.perf_counter()
     elapsed_time_visualization_all = np.round(t_visualization_end_all - t_visualization_start_all, 2)
 
-    print(f"VISUALIZATION time: {elapsed_time_visualization_all}s")
+    logging.info(f"VISUALIZATION time: {elapsed_time_visualization_all}s")
