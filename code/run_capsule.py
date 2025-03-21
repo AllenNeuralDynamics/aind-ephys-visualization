@@ -26,7 +26,6 @@ import spikeinterface.qualitymetrics as sqm
 # VIZ
 import matplotlib.pyplot as plt
 import sortingview.views as vv
-import kachery_cloud as kcl
 
 # AIND
 from aind_data_schema.core.processing import DataProcess
@@ -156,18 +155,13 @@ if __name__ == "__main__":
     logging.info(f"Session name: {session_name}")
 
     # check kachery client
-    kachery_client = None
-    # further protection against kachery-cloud throwing errors
-    try:
-        kachery_client = kcl.get_client_info()
-    except:
-        pass
+    kachery_set = os.environ.get("KACHERY_API_KEY", None)
 
-    if kachery_client is not None:
+    if kachery_set:
         logging.info(f"Kachery plots enabled")
         plot_kachery = True
     else:
-        logging.info(f"Kachery plots disabled. Client not found")
+        logging.info(f"Kachery plots disabled. KACHERY_API_KEY not found")
         plot_kachery = False
 
     # Retrieve recording_names from preprocessed folder
