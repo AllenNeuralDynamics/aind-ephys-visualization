@@ -1,4 +1,4 @@
-# hash:sha256:d53c21679e91d23309e10e068b2baf565c119b7e054d38f04817ce687c5f7fdc
+# hash:sha256:2712e00c5691a3e82da26a7a7f7ccdc095679d589b4c297dc1c41aa5a794571f
 ARG REGISTRY_HOST
 FROM $REGISTRY_HOST/codeocean/jupyterlab:3.6.1-miniconda4.12.0-python3.9-ubuntu20.04
 
@@ -6,8 +6,7 @@ ARG DEBIAN_FRONTEND=noninteractive
 ARG AWS_ACCESS_KEY_ID
 ARG AWS_DEFAULT_REGION
 ARG AWS_SECRET_ACCESS_KEY
-ARG KACHERY_CLOUD_CLIENT_ID
-ARG KACHERY_CLOUD_PRIVATE_KEY
+ARG CUSTOM_KEY_2
 ARG KACHERY_ZONE
 
 ARG GIT_ASKPASS
@@ -23,6 +22,8 @@ RUN apt-get update \
 
 RUN pip install -U --no-cache-dir \
     aind-data-schema==0.38.0 \
+    numpy==1.26.4 \
     pyvips==2.2.1 \
+    sortingview==0.14.1 \
     spikeinterface[full,widgets]==0.100.7 \
     wavpack-numcodecs==0.1.5
