@@ -332,37 +332,40 @@ if __name__ == "__main__":
             # plot motion
             v_motion = None
             if motion_folder.is_dir():
-                logging.info("\tVisualizing motion")
                 motion_info = spre.load_motion_info(motion_folder)
 
-                cmap = visualization_params["motion"]["cmap"]
-                scatter_decimate = visualization_params["motion"]["scatter_decimate"]
-                figsize = visualization_params["motion"]["figsize"]
+                if motion_info["motion"] is not None:
+                    logging.info("\tVisualizing motion")
 
-                fig_motion = plt.figure(figsize=figsize)
-                # motion correction is performed after concatenation
-                # since multi-segment is not supported
-                if recording.get_num_segments() > 1:
-                    recording_c = si.concatenate_recordings([recording])
-                else:
-                    recording_c = recording
-                w_motion = sw.plot_motion_info(
-                    motion_info,
-                    recording=recording_c,
-                    figure=fig_motion,
-                    color_amplitude=True,
-                    amplitude_cmap=cmap,
-                    scatter_decimate=scatter_decimate,
-                )
+                    cmap = visualization_params["motion"]["cmap"]
+                    scatter_decimate = visualization_params["motion"]["scatter_decimate"]
+                    figsize = visualization_params["motion"]["figsize"]
 
-                fig_motion.savefig(visualization_output_folder / "motion.png", dpi=300)
+                    fig_motion = plt.figure(figsize=figsize)
+                    # motion correction is performed after concatenation
+                    # since multi-segment is not supported
+                    if recording.get_num_segments() > 1:
+                        recording_c = si.concatenate_recordings([recording])
+                    else:
+                        recording_c = recording
 
-                # make a sorting view View
-                if plot_kachery:
-                    v_motion = vv.TabLayoutItem(
-                        label=f"Motion",
-                        view=vv.Image(image_path=str(visualization_output_folder / "motion.png")),
+                    w_motion = sw.plot_motion_info(
+                        motion_info,
+                        recording=recording_c,
+                        figure=fig_motion,
+                        color_amplitude=True,
+                        amplitude_cmap=cmap,
+                        scatter_decimate=scatter_decimate,
                     )
+
+                    fig_motion.savefig(visualization_output_folder / "motion.png", dpi=300)
+
+                    # make a sorting view View
+                    if plot_kachery:
+                        v_motion = vv.TabLayoutItem(
+                            label=f"Motion",
+                            view=vv.Image(image_path=str(visualization_output_folder / "motion.png")),
+                        )
 
         # timeseries
         logging.info(f"\tVisualizing timeseries")
