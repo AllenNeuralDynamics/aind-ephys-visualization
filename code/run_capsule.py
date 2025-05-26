@@ -71,11 +71,15 @@ if __name__ == "__main__":
     PARAMS = args.params
 
     if PARAMS is not None:
-        if Path(PARAMS).is_file():
-            with open(PARAMS, "r") as f:
-                visualization_params = json.load(f)
-        else:
+        try:
+            # try to parse the JSON string first to avoid file name too long error
             visualization_params = json.loads(PARAMS)
+        except json.JSONDecodeError:
+            if Path(PARAMS).is_file():
+                with open(PARAMS, "r") as f:
+                    visualization_params = json.load(f)
+            else:
+                raise ValueError(f"Invalid parameters: {PARAMS} is not a valid JSON string or file path")
     else:
         with open("params.json", "r") as f:
             visualization_params = json.load(f)
