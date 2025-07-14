@@ -89,26 +89,30 @@ if __name__ == "__main__":
     N_JOBS = int(N_JOBS_CO) if N_JOBS_CO is not None else N_JOBS
 
     ecephys_sessions = [p for p in data_folder.iterdir() if "ecephys" in p.name.lower()]
-    ecephys_session_folder = ecephys_sessions[0]
-    if HAVE_AIND_LOG_UTILS:
-        # look for subject.json and data_description.json files
-        subject_json = ecephys_session_folder / "subject.json"
-        subject_id = "undefined"
-        if subject_json.is_file():
-            subject_data = json.load(open(subject_json, "r"))
-            subject_id = subject_data["subject_id"]
+    ecephys_session_folder = None
+    if len(ecephys_sessions) == 1:
+        ecephys_session_folder = ecephys_sessions[0]
+        if HAVE_AIND_LOG_UTILS:
+            # look for subject.json and data_description.json files
+            subject_json = ecephys_session_folder / "subject.json"
+            subject_id = "undefined"
+            if subject_json.is_file():
+                subject_data = json.load(open(subject_json, "r"))
+                subject_id = subject_data["subject_id"]
 
-        data_description_json = ecephys_session_folder / "data_description.json"
-        session_name = "undefined"
-        if data_description_json.is_file():
-            data_description = json.load(open(data_description_json, "r"))
-            session_name = data_description["name"]
+            data_description_json = ecephys_session_folder / "data_description.json"
+            session_name = "undefined"
+            if data_description_json.is_file():
+                data_description = json.load(open(data_description_json, "r"))
+                session_name = data_description["name"]
 
-        log.setup_logging(
-            "Visualize Ecephys",
-            subject_id=subject_id,
-            asset_name=session_name,
-        )
+            log.setup_logging(
+                "Visualize Ecephys",
+                subject_id=subject_id,
+                asset_name=session_name,
+            )
+        else:
+            logging.basicConfig(level=logging.INFO, stream=sys.stdout, format="%(message)s")
     else:
         logging.basicConfig(level=logging.INFO, stream=sys.stdout, format="%(message)s")
 
@@ -138,18 +142,6 @@ if __name__ == "__main__":
         unit_classifier_folder = data_folder
         spikesorted_folder = data_folder
         data_processes_spikesorting_folder = data_folder
-
-    # in pipeline the ephys folder is renames 'ecephys_session'
-    # in this case, grab session name from data_description (if it exists)
-    data_description_file = ecephys_session_folder / "data_description.json"
-    if data_description_file.is_file():
-        with open(data_description_file, "r") as f:
-            data_description_dict = json.load(f)
-        session_name = data_description_dict["name"]
-    else:
-        session_name = ecephys_session_folder.name
-
-    logging.info(f"Session name: {session_name}")
 
     # check kachery client
     kachery_set = os.environ.get("KACHERY_API_KEY", None)
@@ -209,6 +201,7 @@ if __name__ == "__main__":
 
         if recording_job_dict is not None:
             skip_times = recording_job_dict.get("skip_times", False)
+            session_name = recording_job_dict["session_name"]
         else:
             skip_times = False
 
