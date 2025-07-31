@@ -1,4 +1,4 @@
-# hash:sha256:37a9b889afaac2b5223a377349c8d934953f18715575e17567a57ad8ccb48fe3
+# hash:sha256:00d5f7edeb218474a6f2c642028b3d697f70b29c6c2f5732429d5b182b93c62a
 ARG REGISTRY_HOST
 FROM $REGISTRY_HOST/codeocean/jupyterlab:3.6.1-miniconda4.12.0-python3.9-ubuntu20.04
 
@@ -6,7 +6,7 @@ ARG DEBIAN_FRONTEND=noninteractive
 ARG AWS_ACCESS_KEY_ID
 ARG AWS_DEFAULT_REGION
 ARG AWS_SECRET_ACCESS_KEY
-ARG CUSTOM_KEY_2
+ARG KACHERY_API_KEY
 ARG KACHERY_ZONE
 
 ARG GIT_ASKPASS
@@ -27,7 +27,7 @@ RUN pip install -U --no-cache-dir \
     aind-log-utils==0.2.3 \
     pyvips==2.2.1 \
     sortingview==0.14.1 \
-    spikeinterface[full,widgets]==0.102.1 \
+    spikeinterface[full,widgets]==0.102.3 \
     wavpack-numcodecs==0.2.2
 
 COPY postInstall /

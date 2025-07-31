@@ -26,7 +26,6 @@ import spikeinterface.qualitymetrics as sqm
 # VIZ
 import matplotlib.pyplot as plt
 import sortingview.views as vv
-import kachery_cloud as kcl
 
 # AIND
 from aind_data_schema.core.processing import DataProcess
@@ -60,11 +59,8 @@ n_jobs_help = (
 n_jobs_group.add_argument("static_n_jobs", nargs="?", default="-1", help=n_jobs_help)
 n_jobs_group.add_argument("--n-jobs", default="-1", help=n_jobs_help)
 
-params_group = parser.add_mutually_exclusive_group()
-params_file_help = "Optional json file with parameters"
-params_group.add_argument("static_params_file", nargs="?", default=None, help=params_file_help)
-params_group.add_argument("--params-file", default=None, help=params_file_help)
-params_group.add_argument("--params-str", default=None, help="Optional json string with parameters")
+parser.add_argument("--params", default=None, help="Path to the parameters file or JSON string. If given, it will override all other arguments.")
+
 
 
 if __name__ == "__main__":
@@ -72,15 +68,27 @@ if __name__ == "__main__":
 
     N_JOBS = args.static_n_jobs or args.n_jobs
     N_JOBS = int(N_JOBS) if not N_JOBS.startswith("0.") else float(N_JOBS)
-    PARAMS_FILE = args.static_params_file or args.params_file
-    PARAMS_STR = args.params_str
+    PARAMS = args.params
+
+    if PARAMS is not None:
+        try:
+            # try to parse the JSON string first to avoid file name too long error
+            visualization_params = json.loads(PARAMS)
+        except json.JSONDecodeError:
+            if Path(PARAMS).is_file():
+                with open(PARAMS, "r") as f:
+                    visualization_params = json.load(f)
+            else:
+                raise ValueError(f"Invalid parameters: {PARAMS} is not a valid JSON string or file path")
+    else:
+        with open("params.json", "r") as f:
+            visualization_params = json.load(f)
 
     # Use CO_CPUS env variable if available
     N_JOBS_CO = os.getenv("CO_CPUS")
     N_JOBS = int(N_JOBS_CO) if N_JOBS_CO is not None else N_JOBS
 
     ecephys_sessions = [p for p in data_folder.iterdir() if "ecephys" in p.name.lower()]
-    assert len(ecephys_sessions) == 1, f"Attach one session at a time {ecephys_sessions}"
     ecephys_session_folder = ecephys_sessions[0]
     if HAVE_AIND_LOG_UTILS:
         # look for subject.json and data_description.json files
@@ -104,23 +112,11 @@ if __name__ == "__main__":
     else:
         logging.basicConfig(level=logging.INFO, stream=sys.stdout, format="%(message)s")
 
-    if PARAMS_FILE is not None:
-        logging.info(f"\nUsing custom parameter file: {PARAMS_FILE}")
-        with open(PARAMS_FILE, "r") as f:
-            processing_params = json.load(f)
-    elif PARAMS_STR is not None:
-        processing_params = json.loads(PARAMS_STR)
-    else:
-        with open("params.json", "r") as f:
-            processing_params = json.load(f)
-
     data_process_prefix = "data_process_visualization"
 
-    job_kwargs = processing_params["job_kwargs"]
+    job_kwargs = visualization_params.pop("job_kwargs")
     job_kwargs["n_jobs"] = N_JOBS
     si.set_global_job_kwargs(**job_kwargs)
-
-    visualization_params = processing_params["visualization"]
 
     ###### VISUALIZATION #########
     logging.info("\n\nVISUALIZATION")
@@ -333,37 +329,40 @@ if __name__ == "__main__":
             # plot motion
             v_motion = None
             if motion_folder.is_dir():
-                logging.info("\tVisualizing motion")
                 motion_info = spre.load_motion_info(motion_folder)
 
-                cmap = visualization_params["motion"]["cmap"]
-                scatter_decimate = visualization_params["motion"]["scatter_decimate"]
-                figsize = visualization_params["motion"]["figsize"]
+                if motion_info["motion"] is not None:
+                    logging.info("\tVisualizing motion")
 
-                fig_motion = plt.figure(figsize=figsize)
-                # motion correction is performed after concatenation
-                # since multi-segment is not supported
-                if recording.get_num_segments() > 1:
-                    recording_c = si.concatenate_recordings([recording])
-                else:
-                    recording_c = recording
-                w_motion = sw.plot_motion_info(
-                    motion_info,
-                    recording=recording_c,
-                    figure=fig_motion,
-                    color_amplitude=True,
-                    amplitude_cmap=cmap,
-                    scatter_decimate=scatter_decimate,
-                )
+                    cmap = visualization_params["motion"]["cmap"]
+                    scatter_decimate = visualization_params["motion"]["scatter_decimate"]
+                    figsize = visualization_params["motion"]["figsize"]
 
-                fig_motion.savefig(visualization_output_folder / "motion.png", dpi=300)
+                    fig_motion = plt.figure(figsize=figsize)
+                    # motion correction is performed after concatenation
+                    # since multi-segment is not supported
+                    if recording.get_num_segments() > 1:
+                        recording_c = si.concatenate_recordings([recording])
+                    else:
+                        recording_c = recording
 
-                # make a sorting view View
-                if plot_kachery:
-                    v_motion = vv.TabLayoutItem(
-                        label=f"Motion",
-                        view=vv.Image(image_path=str(visualization_output_folder / "motion.png")),
+                    w_motion = sw.plot_motion_info(
+                        motion_info,
+                        recording=recording_c,
+                        figure=fig_motion,
+                        color_amplitude=True,
+                        amplitude_cmap=cmap,
+                        scatter_decimate=scatter_decimate,
                     )
+
+                    fig_motion.savefig(visualization_output_folder / "motion.png", dpi=300)
+
+                    # make a sorting view View
+                    if plot_kachery:
+                        v_motion = vv.TabLayoutItem(
+                            label=f"Motion",
+                            view=vv.Image(image_path=str(visualization_output_folder / "motion.png")),
+                        )
 
         # timeseries
         logging.info(f"\tVisualizing timeseries")
