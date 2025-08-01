@@ -390,7 +390,7 @@ if __name__ == "__main__":
                         )
 
         # timeseries
-        logging.info(f"\tVisualizing timeseries")
+        logging.info(f"\tVisualizing traces")
         timeseries_tab_items = []
 
         timeseries_data = preprocessing_vizualization_data[recording_name]["timeseries"]
@@ -406,7 +406,7 @@ if __name__ == "__main__":
                 if skip_times:
                     rec.reset_times()
             except Exception as e:
-                logging.info(f"\t\tCould not load layer {layer}. Skipping")
+                logging.info(f"\t\tCould not load full layer {layer}.\nError:\n{e}")
                 continue
             chunk = si.get_random_data_chunks(rec)
             max_value = np.quantile(chunk, 0.99) * 1.2
@@ -426,7 +426,7 @@ if __name__ == "__main__":
                     if skip_times:
                         rec.reset_times()
                 except:
-                    logging.info(f"\t\tCould not load layer {layer}. Skipping")
+                    logging.info(f"\t\tCould not load processed layer {layer}.\nError:\n{e}")
                     continue
                 chunk = si.get_random_data_chunks(rec)
                 max_value = np.quantile(chunk, 0.99) * 1.2
