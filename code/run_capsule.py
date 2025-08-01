@@ -425,7 +425,7 @@ if __name__ == "__main__":
                     rec = si.load(rec_dict, base_folder=data_folder)
                     if skip_times:
                         rec.reset_times()
-                except:
+                except Exception as e:
                     logging.info(f"\t\tCould not load processed layer {layer}.\nError:\n{e}")
                     continue
                 chunk = si.get_random_data_chunks(rec)
