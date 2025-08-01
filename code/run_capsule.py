@@ -239,6 +239,11 @@ if __name__ == "__main__":
         # if spike locations are not available, detect and localize peaks
         if not spike_locations_available:
             if motion_is_available:
+                drift_data = preprocessing_vizualization_data[recording_name]["drift"]
+                recording = si.load(drift_data["recording"], base_folder=preprocessed_folder)
+                if skip_times:
+                    recording.reset_times()
+
                 motion_info = spre.load_motion_info(motion_folder)
                 logging.info(f"\tVisualizing drift maps using motion data (no spike sorting available)")
                 peaks = motion_info["peaks"]
