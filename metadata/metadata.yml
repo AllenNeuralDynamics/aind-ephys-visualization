@@ -1,5 +1,5 @@
 metadata_version: 1
-name: Visualize Ecephys (dev)
+name: Visualize Ecephys
 description: |-
   This capsule is designed to visualize ephys and spike sorted data for the AIND pipeline.
 
