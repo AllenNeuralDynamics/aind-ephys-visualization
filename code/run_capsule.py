@@ -50,8 +50,12 @@ results_folder = Path("../results/")
 # Define argument parser
 parser = argparse.ArgumentParser(description="Curate ecephys data")
 
+output_format_group = parser.add_mutually_exclusive_group()
+output_format_help = "Format for output figures. Default 'png'"
+output_format_group.add_argument("static_output_format", nargs="?", default="png", help=output_format_help)
+output_format_group.add_argument("--output-format", default="png", help=output_format_help)
+
 n_jobs_group = parser.add_mutually_exclusive_group()
-n_jobs_help = "Duration of clipped recording in debug mode. Default is 30 seconds. Only used if debug is enabled"
 n_jobs_help = (
     "Number of jobs to use for parallel processing. Default is -1 (all available cores). "
     "It can also be a float between 0 and 1 to use a fraction of available cores"
@@ -68,6 +72,7 @@ if __name__ == "__main__":
 
     N_JOBS = args.static_n_jobs or args.n_jobs
     N_JOBS = int(N_JOBS) if not N_JOBS.startswith("0.") else float(N_JOBS)
+    OUTPUT_FORMAT = args.static_output_format or args.output_format
     PARAMS = args.params
 
     if PARAMS is not None:
@@ -89,26 +94,30 @@ if __name__ == "__main__":
     N_JOBS = int(N_JOBS_CO) if N_JOBS_CO is not None else N_JOBS
 
     ecephys_sessions = [p for p in data_folder.iterdir() if "ecephys" in p.name.lower()]
-    ecephys_session_folder = ecephys_sessions[0]
-    if HAVE_AIND_LOG_UTILS:
-        # look for subject.json and data_description.json files
-        subject_json = ecephys_session_folder / "subject.json"
-        subject_id = "undefined"
-        if subject_json.is_file():
-            subject_data = json.load(open(subject_json, "r"))
-            subject_id = subject_data["subject_id"]
+    ecephys_session_folder = None
+    if len(ecephys_sessions) == 1:
+        ecephys_session_folder = ecephys_sessions[0]
+        if HAVE_AIND_LOG_UTILS:
+            # look for subject.json and data_description.json files
+            subject_json = ecephys_session_folder / "subject.json"
+            subject_id = "undefined"
+            if subject_json.is_file():
+                subject_data = json.load(open(subject_json, "r"))
+                subject_id = subject_data["subject_id"]
 
-        data_description_json = ecephys_session_folder / "data_description.json"
-        session_name = "undefined"
-        if data_description_json.is_file():
-            data_description = json.load(open(data_description_json, "r"))
-            session_name = data_description["name"]
+            data_description_json = ecephys_session_folder / "data_description.json"
+            session_name = "undefined"
+            if data_description_json.is_file():
+                data_description = json.load(open(data_description_json, "r"))
+                session_name = data_description["name"]
 
-        log.setup_logging(
-            "Visualize Ecephys",
-            subject_id=subject_id,
-            asset_name=session_name,
-        )
+            log.setup_logging(
+                "Visualize Ecephys",
+                subject_id=subject_id,
+                asset_name=session_name,
+            )
+        else:
+            logging.basicConfig(level=logging.INFO, stream=sys.stdout, format="%(message)s")
     else:
         logging.basicConfig(level=logging.INFO, stream=sys.stdout, format="%(message)s")
 
@@ -138,18 +147,6 @@ if __name__ == "__main__":
         unit_classifier_folder = data_folder
         spikesorted_folder = data_folder
         data_processes_spikesorting_folder = data_folder
-
-    # in pipeline the ephys folder is renames 'ecephys_session'
-    # in this case, grab session name from data_description (if it exists)
-    data_description_file = ecephys_session_folder / "data_description.json"
-    if data_description_file.is_file():
-        with open(data_description_file, "r") as f:
-            data_description_dict = json.load(f)
-        session_name = data_description_dict["name"]
-    else:
-        session_name = ecephys_session_folder.name
-
-    logging.info(f"Session name: {session_name}")
 
     # check kachery client
     kachery_set = os.environ.get("KACHERY_API_KEY", None)
@@ -209,6 +206,7 @@ if __name__ == "__main__":
 
         if recording_job_dict is not None:
             skip_times = recording_job_dict.get("skip_times", False)
+            session_name = recording_job_dict["session_name"]
         else:
             skip_times = False
 
@@ -222,6 +220,7 @@ if __name__ == "__main__":
             analyzer_folder = analyzer_binary_folder
         elif analyzer_zarr_folder.is_dir():
             analyzer_folder = analyzer_zarr_folder
+        motion_is_available = motion_folder.is_dir()
 
         if analyzer_folder is not None:
             try:
@@ -239,44 +238,59 @@ if __name__ == "__main__":
 
         # if spike locations are not available, detect and localize peaks
         if not spike_locations_available:
-            from spikeinterface.core.node_pipeline import ExtractDenseWaveforms, run_node_pipeline
-            from spikeinterface.sortingcomponents.peak_detection import DetectPeakLocallyExclusive
-            from spikeinterface.sortingcomponents.peak_localization import LocalizeCenterOfMass
-
-            logging.info(f"\tVisualizing drift maps using detected peaks (no spike sorting available)")
-            # locally_exclusive + pipeline steps LocalizeCenterOfMass + PeakToPeakFeature
-            drift_data = preprocessing_vizualization_data[recording_name]["drift"]
-            try:
+            if motion_is_available:
+                drift_data = preprocessing_vizualization_data[recording_name]["drift"]
                 recording = si.load(drift_data["recording"], base_folder=preprocessed_folder)
                 if skip_times:
                     recording.reset_times()
 
-                # Here we use the node pipeline implementation
-                peak_detector_node = DetectPeakLocallyExclusive(recording, **visualization_params["drift"]["detection"])
-                extract_dense_waveforms_node = ExtractDenseWaveforms(
-                    recording,
-                    ms_before=visualization_params["drift"]["localization"]["ms_before"],
-                    ms_after=visualization_params["drift"]["localization"]["ms_after"],
-                    parents=[peak_detector_node],
-                    return_output=False,
-                )
-                localize_peaks_node = LocalizeCenterOfMass(
-                    recording,
-                    radius_um=visualization_params["drift"]["localization"]["radius_um"],
-                    parents=[peak_detector_node, extract_dense_waveforms_node],
-                )
-                pipeline_nodes = [peak_detector_node, extract_dense_waveforms_node, localize_peaks_node]
-                peaks, peak_locations = run_node_pipeline(
-                    recording, nodes=pipeline_nodes, job_kwargs=si.get_global_job_kwargs()
-                )
-                logging.info(f"\t\tDetected {len(peaks)} peaks")
+                motion_info = spre.load_motion_info(motion_folder)
+                logging.info(f"\tVisualizing drift maps using motion data (no spike sorting available)")
+                peaks = motion_info["peaks"]
+                peak_locations = motion_info["peak_locations"]
                 peak_amps = peaks["amplitude"]
                 if len(peaks) == 0:
                     logging.info("\t\tNo peaks detected. Skipping drift map")
                     skip_drift = True
-            except Exception as e:
-                logging.info(f"\t\tCould not load drift recording. Skipping")
-                skip_drift = True
+            else:
+                from spikeinterface.core.node_pipeline import ExtractDenseWaveforms, run_node_pipeline
+                from spikeinterface.sortingcomponents.peak_detection import DetectPeakLocallyExclusive
+                from spikeinterface.sortingcomponents.peak_localization import LocalizeCenterOfMass
+
+                logging.info(f"\tVisualizing drift maps using detected peaks (no spike sorting available)")
+                # locally_exclusive + pipeline steps LocalizeCenterOfMass + PeakToPeakFeature
+                drift_data = preprocessing_vizualization_data[recording_name]["drift"]
+                try:
+                    recording = si.load(drift_data["recording"], base_folder=preprocessed_folder)
+                    if skip_times:
+                        recording.reset_times()
+
+                    # Here we use the node pipeline implementation
+                    peak_detector_node = DetectPeakLocallyExclusive(recording, **visualization_params["drift"]["detection"])
+                    extract_dense_waveforms_node = ExtractDenseWaveforms(
+                        recording,
+                        ms_before=visualization_params["drift"]["localization"]["ms_before"],
+                        ms_after=visualization_params["drift"]["localization"]["ms_after"],
+                        parents=[peak_detector_node],
+                        return_output=False,
+                    )
+                    localize_peaks_node = LocalizeCenterOfMass(
+                        recording,
+                        radius_um=visualization_params["drift"]["localization"]["radius_um"],
+                        parents=[peak_detector_node, extract_dense_waveforms_node],
+                    )
+                    pipeline_nodes = [peak_detector_node, extract_dense_waveforms_node, localize_peaks_node]
+                    peaks, peak_locations = run_node_pipeline(
+                        recording, nodes=pipeline_nodes, job_kwargs=si.get_global_job_kwargs()
+                    )
+                    logging.info(f"\t\tDetected {len(peaks)} peaks")
+                    peak_amps = peaks["amplitude"]
+                    if len(peaks) == 0:
+                        logging.info("\t\tNo peaks detected. Skipping drift map")
+                        skip_drift = True
+                except Exception as e:
+                    logging.info(f"\t\tCould not load drift recording. Skipping")
+                    skip_drift = True
 
         if not skip_drift:
             fig_drift, axs_drift = plt.subplots(
@@ -317,18 +331,24 @@ if __name__ == "__main__":
                 ax_drift.spines["top"].set_visible(False)
                 ax_drift.spines["right"].set_visible(False)
 
-            fig_drift.savefig(visualization_output_folder / "drift_map.png", dpi=300)
+            drift_map_fig_file = visualization_output_folder / f"drift_map.{OUTPUT_FORMAT}"
+            fig_drift.savefig(drift_map_fig_file, dpi=300)
 
             # make a sorting view View
             v_drift = None
             if plot_kachery:
+                if OUTPUT_FORMAT != "png":
+                    # kachery needs a png
+                    drift_map_fig_file = scratch_folder / f"{recording_name}_map.png"
+                    fig_drift.savefig(drift_map_fig_file, dpi=300)
+
                 v_drift = vv.TabLayoutItem(
-                    label=f"Drift map", view=vv.Image(image_path=str(visualization_output_folder / "drift_map.png"))
+                    label=f"Drift map", view=vv.Image(image_path=str(drift_map_fig_file))
                 )
 
             # plot motion
             v_motion = None
-            if motion_folder.is_dir():
+            if motion_is_available:
                 motion_info = spre.load_motion_info(motion_folder)
 
                 if motion_info["motion"] is not None:
@@ -354,18 +374,23 @@ if __name__ == "__main__":
                         amplitude_cmap=cmap,
                         scatter_decimate=scatter_decimate,
                     )
-
-                    fig_motion.savefig(visualization_output_folder / "motion.png", dpi=300)
+                    motion_fig_file = visualization_output_folder / f"motion.{OUTPUT_FORMAT}"
+                    fig_motion.savefig(motion_fig_file, dpi=300)
 
                     # make a sorting view View
                     if plot_kachery:
+                        if OUTPUT_FORMAT != "png":
+                            # kachery needs a png
+                            motion_fig_file = scratch_folder / f"{recording_name}_motion.png"
+                            fig_motion.savefig(motion_fig_file, dpi=300)
+
                         v_motion = vv.TabLayoutItem(
                             label=f"Motion",
-                            view=vv.Image(image_path=str(visualization_output_folder / "motion.png")),
+                            view=vv.Image(image_path=str(motion_fig_file)),
                         )
 
         # timeseries
-        logging.info(f"\tVisualizing timeseries")
+        logging.info(f"\tVisualizing traces")
         timeseries_tab_items = []
 
         timeseries_data = preprocessing_vizualization_data[recording_name]["timeseries"]
@@ -381,7 +406,7 @@ if __name__ == "__main__":
                 if skip_times:
                     rec.reset_times()
             except Exception as e:
-                logging.info(f"\t\tCould not load layer {layer}. Skipping")
+                logging.info(f"\t\tCould not load full layer {layer}.\nError:\n{e}")
                 continue
             chunk = si.get_random_data_chunks(rec)
             max_value = np.quantile(chunk, 0.99) * 1.2
@@ -400,8 +425,8 @@ if __name__ == "__main__":
                     rec = si.load(rec_dict, base_folder=data_folder)
                     if skip_times:
                         rec.reset_times()
-                except:
-                    logging.info(f"\t\tCould not load layer {layer}. Skipping")
+                except Exception as e:
+                    logging.info(f"\t\tCould not load processed layer {layer}.\nError:\n{e}")
                     continue
                 chunk = si.get_random_data_chunks(rec)
                 max_value = np.quantile(chunk, 0.99) * 1.2
@@ -523,9 +548,9 @@ if __name__ == "__main__":
                         ax_ts_proc.spines["top"].set_visible(False)
                         ax_ts_proc.spines["right"].set_visible(False)
 
-            fig_ts.savefig(visualization_output_folder / f"traces_full_seg{segment_index}.png", dpi=300)
+            fig_ts.savefig(visualization_output_folder / f"traces_full_seg{segment_index}.{OUTPUT_FORMAT}", dpi=300)
             if fig_ts_proc is not None:
-                fig_ts_proc.savefig(visualization_output_folder / f"traces_proc_seg{segment_index}.png", dpi=300)
+                fig_ts_proc.savefig(visualization_output_folder / f"traces_proc_seg{segment_index}.{OUTPUT_FORMAT}", dpi=300)
 
         if plot_kachery:
             if not skip_drift:
