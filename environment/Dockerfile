@@ -1,4 +1,4 @@
-# hash:sha256:43a306e067ca2095c9996be984109e0bdcac95ebb249d706f85d9e9dd7996c68
+# hash:sha256:0f69697deab5e3aba71870c7aa7db7a11db77a95aecf7b8635e8fc75edfadacc
 ARG REGISTRY_HOST
 FROM $REGISTRY_HOST/codeocean/jupyterlab:3.6.1-miniconda4.12.0-python3.9-ubuntu20.04
 
@@ -8,9 +8,7 @@ ARG AWS_DEFAULT_REGION
 ARG AWS_SECRET_ACCESS_KEY
 ARG KACHERY_API_KEY
 ARG KACHERY_ZONE
-
 ARG GIT_ASKPASS
-ARG GIT_ACCESS_TOKEN
 COPY git-askpass /
 
 ENV GH_CURATION_REPO=gh://AllenNeuralDynamics/ephys-sorting-manual-curation/main
