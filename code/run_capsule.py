@@ -615,7 +615,13 @@ if __name__ == "__main__":
             if data_process_spikesorting_json.is_file():
                 with open(data_process_spikesorting_json, "r") as f:
                     data_process_spikesorting = json.load(f)
-                    sorter_name = data_process_spikesorting["parameters"]["sorter_name"]
+                    code_metadata = data_process_spikesorting.get("code")
+                    if code_metadata:
+                        sorter_name = code_metadata["parameters"]["sorter_name"]
+                    elif "parameters" in data_process_spikesorting:
+                        sorter_name = data_process_spikesorting["parameters"]["sorter_name"]
+                    else:
+                        sorter_name = "unknown"
             else:
                 sorter_name = "unknown"
 
