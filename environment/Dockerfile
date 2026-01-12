@@ -1,4 +1,4 @@
-# hash:sha256:c50110eccb384895fd2f656c345ad30dc97a19ef134fe1da4a540aa5d6b7d758
+# hash:sha256:59bcc9b80f6b34cbb76f3955c2ac7b469363fc98fbafbe3db984445848525b92
 ARG REGISTRY_HOST
 FROM $REGISTRY_HOST/codeocean/mambaforge3:24.5.0-0-python3.12.4-ubuntu22.04
 
@@ -17,7 +17,7 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 RUN pip install -U --no-cache-dir \
-    aind-data-schema==2.0.1 \
+    aind-data-schema==2.4.0 \
     aind-log-utils==0.2.3 \
     pyvips==2.2.1 \
     s3fs==2025.5.1 \
