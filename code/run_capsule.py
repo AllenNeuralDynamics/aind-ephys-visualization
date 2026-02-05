@@ -28,7 +28,9 @@ import matplotlib.pyplot as plt
 import sortingview.views as vv
 
 # AIND
-from aind_data_schema.core.processing import DataProcess
+from aind_data_schema.core.processing import DataProcess, ProcessStage
+from aind_data_schema.components.identifiers import Code
+from aind_data_schema_models.process_names import ProcessName
 
 try:
     from aind_log_utils import log
@@ -613,7 +615,13 @@ if __name__ == "__main__":
             if data_process_spikesorting_json.is_file():
                 with open(data_process_spikesorting_json, "r") as f:
                     data_process_spikesorting = json.load(f)
-                    sorter_name = data_process_spikesorting["parameters"]["sorter_name"]
+                    code_metadata = data_process_spikesorting.get("code")
+                    if code_metadata:
+                        sorter_name = code_metadata["parameters"]["sorter_name"]
+                    elif "parameters" in data_process_spikesorting:
+                        sorter_name = data_process_spikesorting["parameters"]["sorter_name"]
+                    else:
+                        sorter_name = "unknown"
             else:
                 sorter_name = "unknown"
 
@@ -660,9 +668,9 @@ if __name__ == "__main__":
                     except Exception as e:
                         logging.info("\tSortingview plotting resulted in an error")
                 else:
-                    logging.info("\tSkipping sorting summary visualization for {recording_name}. Kachery client not found.")
+                    logging.info(f"\tSkipping sorting summary visualization for {recording_name}. Kachery client not found.")
             else:
-                logging.info("\tSkipping sorting summary visualization for {recording_name}. No units after curation.")
+                logging.info(f"\tSkipping sorting summary visualization for {recording_name}. No units after curation.")
         else:
             logging.info(f"\tSkipping sorting summary visualization for {recording_name}. No sorting information available.")
 
@@ -681,16 +689,21 @@ if __name__ == "__main__":
         elapsed_time_visualization = np.round(t_visualization_end - t_visualization_start, 2)
 
         visualization_params["recording_name"] = recording_name
+
         visualization_process = DataProcess(
+            process_type=ProcessName.EPHYS_VISUALIZATION,
+            stage=ProcessStage.PROCESSING,
             name="Ephys visualization",
-            software_version=VERSION,  # either release or git commit
+            experimenters=["Alessio Buccino"],
+            code=Code(
+                url=URL,
+                version=VERSION, # either release or git commit
+                parameters=visualization_params
+            ),
             start_date_time=datetime_start_visualization,
             end_date_time=datetime_start_visualization + timedelta(seconds=np.floor(elapsed_time_visualization)),
-            input_location=str(data_folder),
-            output_location=str(results_folder),
-            code_url=URL,
-            parameters=visualization_params,
-            outputs=visualization_output,
+            output_path=str(results_folder),
+            output_parameters=visualization_output,
             notes=visualization_notes,
         )
         with open(visualization_output_process_json, "w") as f:
