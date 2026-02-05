@@ -660,9 +660,9 @@ if __name__ == "__main__":
                     except Exception as e:
                         logging.info("\tSortingview plotting resulted in an error")
                 else:
-                    logging.info("\tSkipping sorting summary visualization for {recording_name}. Kachery client not found.")
+                    logging.info(f"\tSkipping sorting summary visualization for {recording_name}. Kachery client not found.")
             else:
-                logging.info("\tSkipping sorting summary visualization for {recording_name}. No units after curation.")
+                logging.info(f"\tSkipping sorting summary visualization for {recording_name}. No units after curation.")
         else:
             logging.info(f"\tSkipping sorting summary visualization for {recording_name}. No sorting information available.")
 
