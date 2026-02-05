@@ -1,29 +1,23 @@
-# hash:sha256:43a306e067ca2095c9996be984109e0bdcac95ebb249d706f85d9e9dd7996c68
+# hash:sha256:59bcc9b80f6b34cbb76f3955c2ac7b469363fc98fbafbe3db984445848525b92
 ARG REGISTRY_HOST
-FROM $REGISTRY_HOST/codeocean/jupyterlab:3.6.1-miniconda4.12.0-python3.9-ubuntu20.04
+FROM $REGISTRY_HOST/codeocean/mambaforge3:24.5.0-0-python3.12.4-ubuntu22.04
 
 ARG DEBIAN_FRONTEND=noninteractive
-ARG AWS_ACCESS_KEY_ID
-ARG AWS_DEFAULT_REGION
-ARG AWS_SECRET_ACCESS_KEY
-ARG KACHERY_API_KEY
-ARG KACHERY_ZONE
-
 ARG GIT_ASKPASS
-ARG GIT_ACCESS_TOKEN
 COPY git-askpass /
 
 ENV GH_CURATION_REPO=gh://AllenNeuralDynamics/ephys-sorting-manual-curation/main
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-        fonts-freefont-ttf=20120503-10 \
+        build-essential=12.9ubuntu3 \
+        fonts-freefont-ttf=20120503-10build1 \
         libvips \
         msttcorefonts \
     && rm -rf /var/lib/apt/lists/*
 
 RUN pip install -U --no-cache-dir \
-    aind-data-schema==1.3.0 \
+    aind-data-schema==2.4.0 \
     aind-log-utils==0.2.3 \
     pyvips==2.2.1 \
     s3fs==2025.5.1 \
