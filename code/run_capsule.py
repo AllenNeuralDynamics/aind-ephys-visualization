@@ -91,9 +91,9 @@ if __name__ == "__main__":
         with open("params.json", "r") as f:
             visualization_params = json.load(f)
 
-    # Use CO_CPUS env variable if available
-    N_JOBS_CO = os.getenv("CO_CPUS")
-    N_JOBS = int(N_JOBS_CO) if N_JOBS_CO is not None else N_JOBS
+    # Use CO_CPUS/N_JOBS_EXT env variable if available
+    N_JOBS_EXT = os.getenv("CO_CPUS") or os.getenv("N_JOBS_EXT")
+    N_JOBS = int(N_JOBS_EXT) if N_JOBS_EXT is not None else N_JOBS
 
     ecephys_sessions = [p for p in data_folder.iterdir() if "ecephys" in p.name.lower()]
     ecephys_session_folder = None
