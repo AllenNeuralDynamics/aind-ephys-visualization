@@ -1,10 +1,10 @@
-# hash:sha256:59bcc9b80f6b34cbb76f3955c2ac7b469363fc98fbafbe3db984445848525b92
+# hash:sha256:27dc0782ef58f4c35826cf21da626c8dfdf0f778c81cbd18426a1cbc8115ba18
 ARG REGISTRY_HOST
 FROM $REGISTRY_HOST/codeocean/mambaforge3:24.5.0-0-python3.12.4-ubuntu22.04
 
 ARG DEBIAN_FRONTEND=noninteractive
 ARG GIT_ASKPASS
-COPY git-askpass /
+COPY git-ask-pass /
 
 ENV GH_CURATION_REPO=gh://AllenNeuralDynamics/ephys-sorting-manual-curation/main
 
@@ -22,5 +22,5 @@ RUN pip install -U --no-cache-dir \
     pyvips==2.2.1 \
     s3fs==2025.5.1 \
     sortingview==0.14.1 \
-    spikeinterface[full,widgets]==0.103.0 \
+    spikeinterface[full,widgets]==0.104.0 \
     wavpack-numcodecs==0.2.2
