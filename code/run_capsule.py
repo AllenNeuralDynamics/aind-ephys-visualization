@@ -256,8 +256,8 @@ if __name__ == "__main__":
                     skip_drift = True
             else:
                 from spikeinterface.core.node_pipeline import ExtractDenseWaveforms, run_node_pipeline
-                from spikeinterface.sortingcomponents.peak_detection import LocallyExclusivePeakDetector
-                from spikeinterface.sortingcomponents.peak_localization import LocalizeCenterOfMass
+                from spikeinterface.sortingcomponents.peak_detection.locally_exclusive import LocallyExclusivePeakDetector
+                from spikeinterface.sortingcomponents.peak_localization.center_of_mass import LocalizeCenterOfMass
 
                 logging.info(f"\tVisualizing drift maps using detected peaks (no spike sorting available)")
                 # locally_exclusive + pipeline steps LocalizeCenterOfMass + PeakToPeakFeature
