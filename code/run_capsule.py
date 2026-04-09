@@ -627,14 +627,7 @@ if __name__ == "__main__":
 
             if len(analyzer.unit_ids) > 0:
                 if plot_kachery:
-                    # tab layout with Summary and Quality Metrics
-                    v_qm = sw.plot_quality_metrics(
-                        analyzer,
-                        skip_metrics=["isi_violations_count", "rp_violations"],
-                        include_metrics_data=True,
-                        backend="sortingview",
-                        generate_url=False,
-                    ).view
+                    items = []
                     v_sorting = sw.plot_sorting_summary(
                         analyzer,
                         displayed_unit_properties=displayed_unit_properties,
@@ -644,13 +637,19 @@ if __name__ == "__main__":
                         backend="sortingview",
                         generate_url=False,
                     ).view
+                    items.append(vv.TabLayoutItem(label="Sorting summary", view=v_sorting))
 
-                    v_summary = vv.TabLayout(
-                        items=[
-                            vv.TabLayoutItem(label="Sorting summary", view=v_sorting),
-                            vv.TabLayoutItem(label="Quality Metrics", view=v_qm),
-                        ]
-                    )
+                    if sorting_analyzer.has_extension("quality_metrics"):
+                        v_qm = sw.plot_quality_metrics(
+                            analyzer,
+                            skip_metrics=["isi_violations_count", "rp_violations"],
+                            include_metrics_data=True,
+                            backend="sortingview",
+                            generate_url=False,
+                        ).view
+                        items.append(vv.TabLayoutItem(label="Quality Metrics", view=v_qm))
+
+                    v_summary = vv.TabLayout(items=items)
 
                     try:
                         # pre-generate gh for curation
