@@ -628,16 +628,24 @@ if __name__ == "__main__":
             if len(analyzer.unit_ids) > 0:
                 if plot_kachery:
                     items = []
-                    v_sorting = sw.plot_sorting_summary(
-                        analyzer,
-                        displayed_unit_properties=displayed_unit_properties,
-                        extra_unit_properties=extra_unit_properties,
-                        curation=True,
-                        label_choices=LABEL_CHOICES,
-                        backend="sortingview",
-                        generate_url=False,
-                    ).view
-                    items.append(vv.TabLayoutItem(label="Sorting summary", view=v_sorting))
+                    required_extensions = ["correlograms", "spike_amplitudes", "unit_locations", "template_similarity"]
+                    missing_extensions = [ext for ext in required_extensions if not analyzer.has_extension(ext)]
+                    if len(missing_extensions) > 0:
+                        logging.info(
+                            f"\tSkipping sorting summary visualization for {recording_name}. "
+                            f"Missing required extensions: {missing_extensions}"
+                        )
+                    else:
+                        v_sorting = sw.plot_sorting_summary(
+                            analyzer,
+                            displayed_unit_properties=displayed_unit_properties,
+                            extra_unit_properties=extra_unit_properties,
+                            curation=True,
+                            label_choices=LABEL_CHOICES,
+                            backend="sortingview",
+                            generate_url=False,
+                        ).view
+                        items.append(vv.TabLayoutItem(label="Sorting summary", view=v_sorting))
 
                     if sorting_analyzer.has_extension("quality_metrics"):
                         v_qm = sw.plot_quality_metrics(
@@ -649,23 +657,26 @@ if __name__ == "__main__":
                         ).view
                         items.append(vv.TabLayoutItem(label="Quality Metrics", view=v_qm))
 
-                    v_summary = vv.TabLayout(items=items)
+                    if len(items) > 0:
+                        v_summary = vv.TabLayout(items=items)
 
-                    try:
-                        # pre-generate gh for curation
-                        if GH_CURATION_REPO is not None:
-                            gh_path = f"{GH_CURATION_REPO}/{session_name}/{recording_name}/{sorter_name}/curation.json"
-                            state = dict(sortingCuration=gh_path)
-                        else:
-                            state = None
-                        url = v_summary.url(
-                            label=f"{session_name} - {recording_name} - {sorter_name} - Sorting Summary", state=state
-                        )
-                        logging.info(f"\n{url}\n")
-                        visualization_output["sorting_summary"] = url
+                        try:
+                            # pre-generate gh for curation
+                            if GH_CURATION_REPO is not None:
+                                gh_path = f"{GH_CURATION_REPO}/{session_name}/{recording_name}/{sorter_name}/curation.json"
+                                state = dict(sortingCuration=gh_path)
+                            else:
+                                state = None
+                            url = v_summary.url(
+                                label=f"{session_name} - {recording_name} - {sorter_name} - Sorting Summary", state=state
+                            )
+                            logging.info(f"\n{url}\n")
+                            visualization_output["sorting_summary"] = url
 
-                    except Exception as e:
-                        logging.info("\tSortingview plotting resulted in an error")
+                        except Exception as e:
+                            logging.info("\tSortingview plotting resulted in an error")
+                    else:
+                        logging.info(f"\tSkipping sorting summary visualization for {recording_name}. No items to display.")
                 else:
                     logging.info(f"\tSkipping sorting summary visualization for {recording_name}. Kachery client not found.")
             else:
