@@ -647,7 +647,7 @@ if __name__ == "__main__":
                         ).view
                         items.append(vv.TabLayoutItem(label="Sorting summary", view=v_sorting))
 
-                    if sorting_analyzer.has_extension("quality_metrics"):
+                    if analyzer.has_extension("quality_metrics"):
                         v_qm = sw.plot_quality_metrics(
                             analyzer,
                             skip_metrics=["isi_violations_count", "rp_violations"],
