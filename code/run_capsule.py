@@ -185,7 +185,8 @@ if __name__ == "__main__":
         recording_folder = preprocessed_folder / f"preprocessed_{recording_name}"
         analyzer_binary_folder = postprocessed_folder / f"postprocessed_{recording_name}"
         analyzer_zarr_folder = postprocessed_folder / f"postprocessed_{recording_name}.zarr"
-        preprocessed_file_stem = preprocessed_folder / f"preprocessedviz_{recording_name}"
+        preprocessedviz_file_json = preprocessed_folder / f"preprocessedviz_{recording_name}.json"
+        preprocessedviz_file_pkl = preprocessed_folder / f"preprocessedviz_{recording_name}.pkl"
         qc_file = curation_folder / f"qc_{recording_name}.npy"
         unit_classifier_file = unit_classifier_folder / f"unit_classifier_{recording_name}.csv"
         motion_folder = preprocessed_folder / f"motion_{recording_name}"
@@ -197,12 +198,17 @@ if __name__ == "__main__":
 
         logging.info(f"Visualizing recording: {recording_name}")
 
-        if preprocessed_file_stem.with_suffix(".json").is_file():
-            with open(preprocessed_file_stem.with_suffix(".json"), "r") as f:
-                preprocessing_vizualization_data = json.load(f)
-        elif preprocessed_file_stem.with_suffix(".pkl").is_file():
-            with open(preprocessed_file_stem.with_suffix(".pkl"), "rb") as f:
-                preprocessing_vizualization_data = pickle.load(f)
+
+        if preprocessedviz_file_json.is_file():
+            with open(preprocessedviz_file_json, "r") as f:
+                preprocessing_visualization_data = json.load(f)
+        elif preprocessedviz_file_pkl.is_file():
+            with open(preprocessedviz_file_pkl, "rb") as f:
+                preprocessing_visualization_data = pickle.load(f)
+        else:
+            raise FileNotFoundError(
+                "Could not load visualization data from JSON/PKL."
+            )
 
         recording_job_dict = None
         for job_dict in job_dicts:
@@ -246,7 +252,7 @@ if __name__ == "__main__":
         # if spike locations are not available, detect and localize peaks
         if not spike_locations_available:
             if motion_is_available:
-                drift_data = preprocessing_vizualization_data[recording_name]["drift"]
+                drift_data = preprocessing_visualization_data[recording_name]["drift"]
                 recording = si.load(drift_data["recording"], base_folder=preprocessed_folder)
                 if skip_times:
                     recording.reset_times()
@@ -266,7 +272,7 @@ if __name__ == "__main__":
 
                 logging.info(f"\tVisualizing drift maps using detected peaks (no spike sorting available)")
                 # locally_exclusive + pipeline steps LocalizeCenterOfMass + PeakToPeakFeature
-                drift_data = preprocessing_vizualization_data[recording_name]["drift"]
+                drift_data = preprocessing_visualization_data[recording_name]["drift"]
                 try:
                     recording = si.load(drift_data["recording"], base_folder=preprocessed_folder)
                     if skip_times:
@@ -400,7 +406,7 @@ if __name__ == "__main__":
         logging.info(f"\tVisualizing traces")
         timeseries_tab_items = []
 
-        timeseries_data = preprocessing_vizualization_data[recording_name]["timeseries"]
+        timeseries_data = preprocessing_visualization_data[recording_name]["timeseries"]
         recording_full_dict = timeseries_data["full"]
         recording_proc_dict = timeseries_data["proc"]
 
