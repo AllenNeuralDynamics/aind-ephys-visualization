@@ -9,6 +9,7 @@ import os
 import numpy as np
 from pathlib import Path
 import json
+import pickle
 import time
 import pandas as pd
 import logging
@@ -184,7 +185,7 @@ if __name__ == "__main__":
         recording_folder = preprocessed_folder / f"preprocessed_{recording_name}"
         analyzer_binary_folder = postprocessed_folder / f"postprocessed_{recording_name}"
         analyzer_zarr_folder = postprocessed_folder / f"postprocessed_{recording_name}.zarr"
-        preprocessed_json_file = preprocessed_folder / f"preprocessedviz_{recording_name}.json"
+        preprocessed_file_stem = preprocessed_folder / f"preprocessedviz_{recording_name}"
         qc_file = curation_folder / f"qc_{recording_name}.npy"
         unit_classifier_file = unit_classifier_folder / f"unit_classifier_{recording_name}.csv"
         motion_folder = preprocessed_folder / f"motion_{recording_name}"
@@ -196,8 +197,12 @@ if __name__ == "__main__":
 
         logging.info(f"Visualizing recording: {recording_name}")
 
-        with open(preprocessed_json_file, "r") as f:
-            preprocessing_vizualization_data = json.load(f)
+        if preprocessed_file_stem.with_suffix(".json").is_file():
+            with open(preprocessed_file_stem.with_suffix(".json"), "r") as f:
+                preprocessing_vizualization_data = json.load(f)
+        elif preprocessed_file_stem.with_suffix(".pkl").is_file():
+            with open(preprocessed_file_stem.with_suffix(".pkl"), "rb") as f:
+                preprocessing_vizualization_data = pickle.load(f)
 
         recording_job_dict = None
         for job_dict in job_dicts:
