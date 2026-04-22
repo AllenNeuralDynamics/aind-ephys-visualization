@@ -1,4 +1,4 @@
-# hash:sha256:27dc0782ef58f4c35826cf21da626c8dfdf0f778c81cbd18426a1cbc8115ba18
+# hash:sha256:0f8413f346a8c5142eaa6025d299f335b56a41d73610bf5faa0939641e145817
 ARG REGISTRY_HOST
 FROM $REGISTRY_HOST/codeocean/mambaforge3:24.5.0-0-python3.12.4-ubuntu22.04
 
@@ -16,11 +16,15 @@ RUN apt-get update \
         msttcorefonts \
     && rm -rf /var/lib/apt/lists/*
 
+RUN conda install -y \
+        jupyterlab==4.5.6 \
+    && conda clean -ya
+
 RUN pip install -U --no-cache-dir \
     aind-data-schema==2.4.0 \
     aind-log-utils==0.2.3 \
     pyvips==2.2.1 \
     s3fs==2025.5.1 \
-    sortingview==0.14.1 \
-    spikeinterface[full,widgets]==0.104.0 \
+    sortingview==0.14.2 \
+    spikeinterface[full,widgets]==0.104.2 \
     wavpack-numcodecs==0.2.2

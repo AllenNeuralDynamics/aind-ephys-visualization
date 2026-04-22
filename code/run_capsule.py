@@ -653,13 +653,14 @@ if __name__ == "__main__":
                         else:
                             state = None
                         url = v_summary.url(
-                            label=f"{session_name} - {recording_name} - {sorter_name} - Sorting Summary", state=state
+                            label=f"{session_name} - {recording_name} - {sorter_name} - Sorting Summary",
+                            state=state,
+                            allow_float64=True
                         )
                         logging.info(f"\n{url}\n")
                         visualization_output["sorting_summary"] = url
-
                     except Exception as e:
-                        logging.info(f"\tSortingview plotting resulted in an error:\n{e}")
+                        logging.info(f"\tSortingview plotting resulted in an error:\n\t{e}")
                 else:
                     logging.info("\tSkipping sorting summary visualization for {recording_name}. Kachery client not found.")
             else:
