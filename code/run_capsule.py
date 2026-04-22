@@ -140,13 +140,11 @@ if __name__ == "__main__":
         postprocessed_folder = data_folder / "postprocessing_pipeline_output_test"
         preprocessed_folder = data_folder / "preprocessing_pipeline_output_test"
         curation_folder = data_folder / "curation_pipeline_output_test"
-        unit_classifier_folder = data_folder / "unit_classifier_pipeline_output_test"
         spikesorted_folder = data_folder / "spikesorting_pipeline_output_test"
     else:
         postprocessed_folder = data_folder
         preprocessed_folder = data_folder
         curation_folder = data_folder
-        unit_classifier_folder = data_folder
         spikesorted_folder = data_folder
         data_processes_spikesorting_folder = data_folder
 
@@ -186,7 +184,7 @@ if __name__ == "__main__":
         analyzer_zarr_folder = postprocessed_folder / f"postprocessed_{recording_name}.zarr"
         preprocessed_json_file = preprocessed_folder / f"preprocessedviz_{recording_name}.json"
         qc_file = curation_folder / f"qc_{recording_name}.npy"
-        unit_classifier_file = unit_classifier_folder / f"unit_classifier_{recording_name}.csv"
+        unit_labels_file = curation_folder / f"unit_labels_{recording_name}.csv"
         motion_folder = preprocessed_folder / f"motion_{recording_name}"
         visualization_output_process_json = results_folder / f"{data_process_prefix}_{recording_name}.json"
         # save vizualization output
@@ -592,23 +590,18 @@ if __name__ == "__main__":
             amplitudes = si.get_template_extremum_amplitude(analyzer, mode="peak_to_peak")
             extra_unit_properties["amplitude"] = np.array(list(amplitudes.values()))
 
-            # add curation column
-            if qc_file.is_file():
-                # add qc property to analyzer sorting
-                default_qc = np.load(qc_file)
-                extra_unit_properties["default_qc"] = default_qc
-
-            # add noise decoder column
-            if unit_classifier_file.is_file():
-                # add decoder_label and decoder probability
-                unit_classifier_df = pd.read_csv(unit_classifier_file, index_col=False)
-                if len(unit_classifier_df) == len(analyzer.unit_ids):
-                    decoder_label = unit_classifier_df["decoder_label"]
-                    extra_unit_properties["decoder_label"] = decoder_label.values.astype(str)
-                    decoder_prob = np.round(unit_classifier_df["decoder_probability"], 2)
-                    extra_unit_properties["decoder_prob"] = decoder_prob.values
-                else:
-                    logging.info(f"\t\tCould not load unit classification data for {recording_name}")
+            # add labels
+            if unit_labels_file.is_file():
+                unit_labels_df = pd.read_csv(unit_labels_file, index_col=False)
+                for label in unit_labels_df.columns:
+                    values = unit_labels_df[label].values
+                    if "_label" in label:
+                        values = np.array(values).astype("str")
+                    elif "probability" in label:
+                        values = np.round(values, 2)
+                    extra_unit_properties[label] = values
+            else:
+                logging.info(f"\t\tCould not load unit labels for {recording_name}")
 
             # retrieve sorter name (if spike sorting was performed)
             data_process_spikesorting_json = spikesorted_folder / f"data_process_spikesorting_{recording_name}.json"
