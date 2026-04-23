@@ -19,26 +19,55 @@ Two types of visualizations are produced:
 The `data/` folder must include:
 
 - the original session data (e.g., "ecephys_664438_2023-04-12_14-59-51")
-- the output of the [aind-ephys-preprocessing](https://github.com/AllenNeuralDynamics/aind-capsule-ephys-preprocessing) capsule
+- the output of the [aind-ephys-preprocessing](https://github.com/AllenNeuralDynamics/aind-ephys-preprocessing) capsule
 - the output of the spike sorting capsule (either with [aind-ephys-spikesort-pykilosort](https://github.com/AllenNeuralDynamics/aind-ephys-spikesort-pykilosort) or [aind-ephys-spikesort-kilosort25](https://github.com/AllenNeuralDynamics/aind-ephys-spikesort-kilosort25))
-- the output of the [aind-capsule-ephys-postprocessing](https://github.com/AllenNeuralDynamics/aind-ephys-postprocessing) capsule
-- the output of the [aind-capsule-ephys-curation](https://github.com/AllenNeuralDynamics/aind-ephys-curation) capsule
+- the output of the [aind-ephys-postprocessing](https://github.com/AllenNeuralDynamics/aind-ephys-postprocessing) capsule
+- the output of the [aind-ephys-curation](https://github.com/AllenNeuralDynamics/aind-ephys-curation) capsule (optional)
+- the output of the [aind-ephys-unit-classifier](https://github.com/AllenNeuralDynamics/aind-ephys-unit-classifier) capsule (optional)
 
 ### Parameters
 
 The `code/run` script takes no arguments.
 
-A list of visualization parameters can be found at the top of the `code/run_capsule.py` script:
+A list of visualization parameters can in the `code/params.json`:
 
 ```python
-visualization_params = dict(
-    timeseries=dict(n_snippets_per_segment=2, snippet_duration_s=0.5, skip=False),
-    drift=dict(detection=dict(method='locally_exclusive', peak_sign='neg', detect_threshold=5, exclude_sweep_ms=0.1), 
-               localization=dict(ms_before=0.1, ms_after=0.3, local_radius_um=100.),
-               n_skip=30, alpha=0.15, vmin=-200, vmax=0, cmap="Greys_r",
-               figsize=(10, 10)),
-    motion=dict(cmap="Greys_r", scatter_decimate=15, figsize=(15, 10))
-)
+{
+    "job_kwargs": {
+        "chunk_duration": "1s",
+        "progress_bar": false
+    },
+    "visualization": {
+        "timeseries": {
+            "n_snippets_per_segment": 2,
+            "snippet_duration_s": 0.5,
+            "skip": false
+        },
+        "drift": {
+            "detection": {
+                "peak_sign": "neg", 
+                "detect_threshold": 5, 
+                "exclude_sweep_ms": 0.1
+            },
+            "localization": {
+                "ms_before": 0.1, 
+                "ms_after": 0.3, 
+                "radius_um": 100.0
+            },
+            "n_skip": 30,
+            "alpha": 0.15,
+            "vmin": -200,
+            "vmax": 0,
+            "cmap": "Greys_r",
+            "figsize": [10, 10]
+        },
+        "motion": {
+            "cmap": "Greys_r", 
+            "scatter_decimate": 15, 
+            "figsize": [15, 10]
+        }
+    }
+}
 ```
 
 ### Output
