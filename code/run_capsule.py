@@ -9,6 +9,7 @@ import os
 import numpy as np
 from pathlib import Path
 import json
+import pickle
 import time
 import pandas as pd
 import logging
@@ -91,9 +92,9 @@ if __name__ == "__main__":
         with open("params.json", "r") as f:
             visualization_params = json.load(f)
 
-    # Use CO_CPUS env variable if available
-    N_JOBS_CO = os.getenv("CO_CPUS")
-    N_JOBS = int(N_JOBS_CO) if N_JOBS_CO is not None else N_JOBS
+    # Use CO_CPUS/N_JOBS_EXT env variable if available
+    N_JOBS_EXT = os.getenv("CO_CPUS") or os.getenv("N_JOBS_EXT")
+    N_JOBS = int(N_JOBS_EXT) if N_JOBS_EXT is not None else N_JOBS
 
     ecephys_sessions = [p for p in data_folder.iterdir() if "ecephys" in p.name.lower()]
     ecephys_session_folder = None
@@ -184,7 +185,8 @@ if __name__ == "__main__":
         recording_folder = preprocessed_folder / f"preprocessed_{recording_name}"
         analyzer_binary_folder = postprocessed_folder / f"postprocessed_{recording_name}"
         analyzer_zarr_folder = postprocessed_folder / f"postprocessed_{recording_name}.zarr"
-        preprocessed_json_file = preprocessed_folder / f"preprocessedviz_{recording_name}.json"
+        preprocessedviz_file_json = preprocessed_folder / f"preprocessedviz_{recording_name}.json"
+        preprocessedviz_file_pkl = preprocessed_folder / f"preprocessedviz_{recording_name}.pkl"
         qc_file = curation_folder / f"qc_{recording_name}.npy"
         unit_classifier_file = unit_classifier_folder / f"unit_classifier_{recording_name}.csv"
         motion_folder = preprocessed_folder / f"motion_{recording_name}"
@@ -196,8 +198,17 @@ if __name__ == "__main__":
 
         logging.info(f"Visualizing recording: {recording_name}")
 
-        with open(preprocessed_json_file, "r") as f:
-            preprocessing_vizualization_data = json.load(f)
+
+        if preprocessedviz_file_json.is_file():
+            with open(preprocessedviz_file_json, "r") as f:
+                preprocessing_visualization_data = json.load(f)
+        elif preprocessedviz_file_pkl.is_file():
+            with open(preprocessedviz_file_pkl, "rb") as f:
+                preprocessing_visualization_data = pickle.load(f)
+        else:
+            raise FileNotFoundError(
+                "Could not load visualization data from JSON/PKL."
+            )
 
         recording_job_dict = None
         for job_dict in job_dicts:
@@ -241,7 +252,7 @@ if __name__ == "__main__":
         # if spike locations are not available, detect and localize peaks
         if not spike_locations_available:
             if motion_is_available:
-                drift_data = preprocessing_vizualization_data[recording_name]["drift"]
+                drift_data = preprocessing_visualization_data[recording_name]["drift"]
                 recording = si.load(drift_data["recording"], base_folder=preprocessed_folder)
                 if skip_times:
                     recording.reset_times()
@@ -256,19 +267,19 @@ if __name__ == "__main__":
                     skip_drift = True
             else:
                 from spikeinterface.core.node_pipeline import ExtractDenseWaveforms, run_node_pipeline
-                from spikeinterface.sortingcomponents.peak_detection import DetectPeakLocallyExclusive
-                from spikeinterface.sortingcomponents.peak_localization import LocalizeCenterOfMass
+                from spikeinterface.sortingcomponents.peak_detection.locally_exclusive import LocallyExclusivePeakDetector
+                from spikeinterface.sortingcomponents.peak_localization.center_of_mass import LocalizeCenterOfMass
 
                 logging.info(f"\tVisualizing drift maps using detected peaks (no spike sorting available)")
                 # locally_exclusive + pipeline steps LocalizeCenterOfMass + PeakToPeakFeature
-                drift_data = preprocessing_vizualization_data[recording_name]["drift"]
+                drift_data = preprocessing_visualization_data[recording_name]["drift"]
                 try:
                     recording = si.load(drift_data["recording"], base_folder=preprocessed_folder)
                     if skip_times:
                         recording.reset_times()
 
                     # Here we use the node pipeline implementation
-                    peak_detector_node = DetectPeakLocallyExclusive(recording, **visualization_params["drift"]["detection"])
+                    peak_detector_node = LocallyExclusivePeakDetector(recording, **visualization_params["drift"]["detection"])
                     extract_dense_waveforms_node = ExtractDenseWaveforms(
                         recording,
                         ms_before=visualization_params["drift"]["localization"]["ms_before"],
@@ -395,7 +406,7 @@ if __name__ == "__main__":
         logging.info(f"\tVisualizing traces")
         timeseries_tab_items = []
 
-        timeseries_data = preprocessing_vizualization_data[recording_name]["timeseries"]
+        timeseries_data = preprocessing_visualization_data[recording_name]["timeseries"]
         recording_full_dict = timeseries_data["full"]
         recording_proc_dict = timeseries_data["proc"]
 
