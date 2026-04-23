@@ -5,6 +5,13 @@ credentials:
   description: AIND Kachery Zone
   value: KACHERY_ZONE
 - type: aws
+<<<<<<< HEAD
+  id: ssoALwSfLIBJ4q
+  description: My_Credentials
+  access_key_id: AWS_ACCESS_KEY_ID
+  secret_access_key: AWS_SECRET_ACCESS_KEY
+  region: AWS_DEFAULT_REGION
+=======
   id: MuGBmE0dHFyzxD
   description: AWS Assumable Role - aind-codeocean-power-user
   access_key_id: AWS_ACCESS_KEY_ID
@@ -14,3 +21,4 @@ credentials:
   id: LOgUp9kKCAk0dYhd
   description: AIND Kachery API Key
   value: KACHERY_API_KEY
+>>>>>>> ac7b440cb9c2dc0c69310cd3fb5bab1e19aed99b
