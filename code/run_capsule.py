@@ -25,7 +25,7 @@ import spikeinterface.qualitymetrics as sqm
 
 # VIZ
 import matplotlib.pyplot as plt
-import sortingview.views as vv
+import figpack.views as vv
 
 # AIND
 from aind_data_schema.core.processing import DataProcess, ProcessStage
@@ -42,8 +42,6 @@ except ImportError:
 URL = "https://github.com/AllenNeuralDynamics/aind-ephys-visualization"
 VERSION = "1.0"
 
-GH_CURATION_REPO = os.getenv("GH_CURATION_REPO")
-LABEL_CHOICES = ["noise", "MUA", "SUA", "pMUA", "pSUA"]
 
 data_folder = Path("../data/")
 scratch_folder = Path("../scratch")
@@ -148,15 +146,15 @@ if __name__ == "__main__":
         spikesorted_folder = data_folder
         data_processes_spikesorting_folder = data_folder
 
-    # check kachery client
-    kachery_set = os.environ.get("KACHERY_API_KEY", None)
+    # check figpack client
+    figpack_set = os.environ.get("FIGPACK_API_KEY", None)
 
-    if kachery_set:
-        logging.info(f"Kachery plots enabled")
-        plot_kachery = True
+    if figpack_set:
+        logging.info(f"Figpack plots enabled")
+        plot_figpack = True
     else:
-        logging.info(f"Kachery plots disabled. KACHERY_API_KEY not found")
-        plot_kachery = False
+        logging.info(f"Figpack plots disabled. FIGPACK_API_KEY not found")
+        plot_figpack = False
 
     # Retrieve recording_names from preprocessed folder
     recording_names = [
@@ -336,9 +334,9 @@ if __name__ == "__main__":
 
             # make a sorting view View
             v_drift = None
-            if plot_kachery:
+            if plot_figpack:
                 if OUTPUT_FORMAT != "png":
-                    # kachery needs a png
+                    # figpack needs a png
                     drift_map_fig_file = scratch_folder / f"{recording_name}_map.png"
                     fig_drift.savefig(drift_map_fig_file, dpi=300)
 
@@ -378,9 +376,9 @@ if __name__ == "__main__":
                     fig_motion.savefig(motion_fig_file, dpi=300)
 
                     # make a sorting view View
-                    if plot_kachery:
+                    if plot_figpack:
                         if OUTPUT_FORMAT != "png":
-                            # kachery needs a png
+                            # figpack needs a png
                             motion_fig_file = scratch_folder / f"{recording_name}_motion.png"
                             fig_motion.savefig(motion_fig_file, dpi=300)
 
@@ -472,7 +470,7 @@ if __name__ == "__main__":
                 time_range = np.round(
                     np.array([t_start, t_start + visualization_params["timeseries"]["snippet_duration_s"]]), 1
                 )
-                if plot_kachery:
+                if plot_figpack:
                     try:
                         w_full = sw.plot_traces(
                             recording_full_loaded,
@@ -481,7 +479,7 @@ if __name__ == "__main__":
                             segment_index=segment_index,
                             clim=clims_full,
                             mode="map",
-                            backend="sortingview",
+                            backend="figpack",
                             generate_url=False,
                         )
                         if recording_proc_dict is not None:
@@ -492,7 +490,7 @@ if __name__ == "__main__":
                                 segment_index=segment_index,
                                 clim=clims_proc,
                                 mode="map",
-                                backend="sortingview",
+                                backend="figpack",
                                 generate_url=False,
                             )
                             view = vv.Splitter(
@@ -508,7 +506,7 @@ if __name__ == "__main__":
                         timeseries_tab_items.append(v_item)
                     except Exception as e:
                         logging.info(
-                            f"\t\tError plotting traces with SortingView for "
+                            f"\t\tError plotting traces with Figpack for "
                             f"{recording_name} - {segment_index} - {time_range}."
                         )
 
@@ -552,7 +550,7 @@ if __name__ == "__main__":
             if fig_ts_proc is not None:
                 fig_ts_proc.savefig(visualization_output_folder / f"traces_proc_seg{segment_index}.{OUTPUT_FORMAT}", dpi=300)
 
-        if plot_kachery:
+        if plot_figpack:
             if not skip_drift:
                 # add drift map if available
                 if v_drift is not None:
@@ -568,7 +566,7 @@ if __name__ == "__main__":
                 logging.info(f"\n{url}\n")
                 visualization_output["timeseries"] = url
             except Exception as e:
-                logging.info(f"Figurl-Sortingview plotting error.")
+                logging.info(f"Figpack plotting error.")
 
         # sorting summary
         skip_sorting_summary = True
@@ -619,13 +617,13 @@ if __name__ == "__main__":
                 sorter_name = "unknown"
 
             if len(analyzer.unit_ids) > 0:
-                if plot_kachery:
+                if plot_figpack:
                     # tab layout with Summary and Quality Metrics
                     v_qm = sw.plot_quality_metrics(
                         analyzer,
                         skip_metrics=["isi_violations_count", "rp_violations"],
                         include_metrics_data=True,
-                        backend="sortingview",
+                        backend="figpack",
                         generate_url=False,
                     ).view
                     v_sorting = sw.plot_sorting_summary(
@@ -634,7 +632,7 @@ if __name__ == "__main__":
                         extra_unit_properties=extra_unit_properties,
                         curation=True,
                         label_choices=LABEL_CHOICES,
-                        backend="sortingview",
+                        backend="figpack",
                         generate_url=False,
                     ).view
 
@@ -646,23 +644,16 @@ if __name__ == "__main__":
                     )
 
                     try:
-                        # pre-generate gh for curation
-                        if GH_CURATION_REPO is not None:
-                            gh_path = f"{GH_CURATION_REPO}/{session_name}/{recording_name}/{sorter_name}/curation.json"
-                            state = dict(sortingCuration=gh_path)
-                        else:
-                            state = None
                         url = v_summary.url(
                             label=f"{session_name} - {recording_name} - {sorter_name} - Sorting Summary",
-                            state=state,
                             allow_float64=True
                         )
                         logging.info(f"\n{url}\n")
                         visualization_output["sorting_summary"] = url
                     except Exception as e:
-                        logging.info(f"\tSortingview plotting resulted in an error:\n\t{e}")
+                        logging.info(f"\tFigpack plotting resulted in an error:\n\t{e}")
                 else:
-                    logging.info("\tSkipping sorting summary visualization for {recording_name}. Kachery client not found.")
+                    logging.info("\tSkipping sorting summary visualization for {recording_name}. Figpack client not found.")
             else:
                 logging.info("\tSkipping sorting summary visualization for {recording_name}. No units after curation.")
         else:
@@ -674,7 +665,7 @@ if __name__ == "__main__":
         visualization_notes = visualization_notes.replace('\\"', "%22")
         visualization_notes = visualization_notes.replace("#", "%23")
 
-        if plot_kachery:
+        if plot_figpack:
             # remove escape characters
             visualization_output_file.write_text(visualization_notes)
 
