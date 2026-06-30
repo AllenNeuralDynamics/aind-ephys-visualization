@@ -50,11 +50,6 @@ results_folder = Path("../results/")
 # Define argument parser
 parser = argparse.ArgumentParser(description="Curate ecephys data")
 
-output_format_group = parser.add_mutually_exclusive_group()
-output_format_help = "Format for output figures. Default 'png'"
-output_format_group.add_argument("static_output_format", nargs="?", default="png", help=output_format_help)
-output_format_group.add_argument("--output-format", default="png", help=output_format_help)
-
 n_jobs_group = parser.add_mutually_exclusive_group()
 n_jobs_help = (
     "Number of jobs to use for parallel processing. Default is -1 (all available cores). "
@@ -72,7 +67,6 @@ if __name__ == "__main__":
 
     N_JOBS = args.static_n_jobs or args.n_jobs
     N_JOBS = int(N_JOBS) if not N_JOBS.startswith("0.") else float(N_JOBS)
-    OUTPUT_FORMAT = args.static_output_format or args.output_format
     PARAMS = args.params
 
     if PARAMS is not None:
@@ -95,30 +89,33 @@ if __name__ == "__main__":
 
     ecephys_sessions = [p for p in data_folder.iterdir() if "ecephys" in p.name.lower()]
     ecephys_session_folder = None
+    logging_set = False
     if len(ecephys_sessions) == 1:
         ecephys_session_folder = ecephys_sessions[0]
         if HAVE_AIND_LOG_UTILS:
-            # look for subject.json and data_description.json files
-            subject_json = ecephys_session_folder / "subject.json"
-            subject_id = "undefined"
-            if subject_json.is_file():
-                subject_data = json.load(open(subject_json, "r"))
-                subject_id = subject_data["subject_id"]
+            try:
+                # look for subject.json and data_description.json files
+                subject_json = ecephys_session_folder / "subject.json"
+                subject_id = "undefined"
+                if subject_json.is_file():
+                    subject_data = json.load(open(subject_json, "r"))
+                    subject_id = subject_data["subject_id"]
 
-            data_description_json = ecephys_session_folder / "data_description.json"
-            session_name = "undefined"
-            if data_description_json.is_file():
-                data_description = json.load(open(data_description_json, "r"))
-                session_name = data_description["name"]
+                data_description_json = ecephys_session_folder / "data_description.json"
+                session_name = "undefined"
+                if data_description_json.is_file():
+                    data_description = json.load(open(data_description_json, "r"))
+                    session_name = data_description["name"]
+                log.setup_logging(
+                    "Visualize Ecephys",
+                    subject_id=subject_id,
+                    asset_name=session_name,
+                )
+                logging_set = True
+            except:
+                pass
 
-            log.setup_logging(
-                "Visualize Ecephys",
-                subject_id=subject_id,
-                asset_name=session_name,
-            )
-        else:
-            logging.basicConfig(level=logging.INFO, stream=sys.stdout, format="%(message)s")
-    else:
+    if not logging_set:
         logging.basicConfig(level=logging.INFO, stream=sys.stdout, format="%(message)s")
 
     data_process_prefix = "data_process_visualization"
@@ -150,11 +147,15 @@ if __name__ == "__main__":
     figpack_set = os.environ.get("FIGPACK_API_KEY", None)
 
     if figpack_set:
-        logging.info(f"Figpack plots enabled")
-        plot_figpack = True
+        figpack_upload = os.environ.get("FIGPACK_UPLOAD", "0")
+        figpack_bucket = os.environ.get("FIGPACK_BUCKET", "default")
+        logging.info(f"Figpack enabled - upload: {figpack_upload} - bucket: {figpack_bucket}")
     else:
-        logging.info(f"Figpack plots disabled. FIGPACK_API_KEY not found")
-        plot_figpack = False
+        logging.info(f"Figpack disabled - FIGPACK_API_KEY not found. Skipping visualization")
+        # make error.txt: figpack not found and return
+        error_file = results_folder / recording_name / "error.txt"
+        error_file.parent.mkdir(exist_ok=True)
+        error_file.write_text("Figpack not found")
 
     # Retrieve recording_names from preprocessed folder
     recording_names = [
@@ -187,8 +188,6 @@ if __name__ == "__main__":
         visualization_output_process_json = results_folder / f"{data_process_prefix}_{recording_name}.json"
         # save vizualization output
         visualization_output_file = results_folder / f"visualization_{recording_name}.json"
-        visualization_output_folder = results_folder / f"visualization_{recording_name}"
-        visualization_output_folder.mkdir(exist_ok=True)
 
         logging.info(f"Visualizing recording: {recording_name}")
 
@@ -329,20 +328,13 @@ if __name__ == "__main__":
                 ax_drift.spines["top"].set_visible(False)
                 ax_drift.spines["right"].set_visible(False)
 
-            drift_map_fig_file = visualization_output_folder / f"drift_map.{OUTPUT_FORMAT}"
+            # figpack needs a png
+            drift_map_fig_file = scratch_folder / f"{recording_name}_map.png"
             fig_drift.savefig(drift_map_fig_file, dpi=300)
 
-            # make a sorting view View
-            v_drift = None
-            if plot_figpack:
-                if OUTPUT_FORMAT != "png":
-                    # figpack needs a png
-                    drift_map_fig_file = scratch_folder / f"{recording_name}_map.png"
-                    fig_drift.savefig(drift_map_fig_file, dpi=300)
-
-                v_drift = vv.TabLayoutItem(
-                    label=f"Drift map", view=vv.Image(image_path=str(drift_map_fig_file))
-                )
+            v_drift = vv.TabLayoutItem(
+                label=f"Drift map", view=vv.Image(image_path_or_data=str(drift_map_fig_file))
+            )
 
             # plot motion
             v_motion = None
@@ -372,20 +364,14 @@ if __name__ == "__main__":
                         amplitude_cmap=cmap,
                         scatter_decimate=scatter_decimate,
                     )
-                    motion_fig_file = visualization_output_folder / f"motion.{OUTPUT_FORMAT}"
+
+                    motion_fig_file = scratch_folder / f"{recording_name}_motion.png"
                     fig_motion.savefig(motion_fig_file, dpi=300)
 
-                    # make a sorting view View
-                    if plot_figpack:
-                        if OUTPUT_FORMAT != "png":
-                            # figpack needs a png
-                            motion_fig_file = scratch_folder / f"{recording_name}_motion.png"
-                            fig_motion.savefig(motion_fig_file, dpi=300)
-
-                        v_motion = vv.TabLayoutItem(
-                            label=f"Motion",
-                            view=vv.Image(image_path=str(motion_fig_file)),
-                        )
+                    v_motion = vv.TabLayoutItem(
+                        label=f"Motion",
+                        view=vv.Image(image_path_or_data=str(motion_fig_file)),
+                    )
 
         # timeseries
         logging.info(f"\tVisualizing traces")
@@ -470,45 +456,44 @@ if __name__ == "__main__":
                 time_range = np.round(
                     np.array([t_start, t_start + visualization_params["timeseries"]["snippet_duration_s"]]), 1
                 )
-                if plot_figpack:
-                    try:
-                        w_full = sw.plot_traces(
-                            recording_full_loaded,
+                try:
+                    w_full = sw.plot_traces(
+                        recording_full_loaded,
+                        order_channel_by_depth=True,
+                        time_range=time_range,
+                        segment_index=segment_index,
+                        clim=clims_full,
+                        mode="map",
+                        backend="figpack",
+                        display=False,
+                    )
+                    if recording_proc_dict is not None:
+                        w_proc = sw.plot_traces(
+                            recording_proc_loaded,
                             order_channel_by_depth=True,
                             time_range=time_range,
                             segment_index=segment_index,
-                            clim=clims_full,
+                            clim=clims_proc,
                             mode="map",
                             backend="figpack",
-                            generate_url=False,
+                            display=False,
                         )
-                        if recording_proc_dict is not None:
-                            w_proc = sw.plot_traces(
-                                recording_proc_loaded,
-                                order_channel_by_depth=True,
-                                time_range=time_range,
-                                segment_index=segment_index,
-                                clim=clims_proc,
-                                mode="map",
-                                backend="figpack",
-                                generate_url=False,
-                            )
-                            view = vv.Splitter(
-                                direction="horizontal",
-                                item1=vv.LayoutItem(w_full.view),
-                                item2=vv.LayoutItem(w_proc.view),
-                            )
-                        else:
-                            view = w_full.view
-                        v_item = vv.TabLayoutItem(
-                            label=f"Timeseries - Segment {segment_index} - Time: {time_range}", view=view
+                        view = vv.Splitter(
+                            direction="horizontal",
+                            item1=vv.LayoutItem(w_full.view),
+                            item2=vv.LayoutItem(w_proc.view),
                         )
-                        timeseries_tab_items.append(v_item)
-                    except Exception as e:
-                        logging.info(
-                            f"\t\tError plotting traces with Figpack for "
-                            f"{recording_name} - {segment_index} - {time_range}."
-                        )
+                    else:
+                        view = w_full.view
+                    v_item = vv.TabLayoutItem(
+                        label=f"Timeseries - Segment {segment_index} - Time: {time_range}", view=view
+                    )
+                    timeseries_tab_items.append(v_item)
+                except Exception as e:
+                    logging.info(
+                        f"\t\tError plotting traces with Figpack for "
+                        f"{recording_name} - {segment_index} - {time_range}."
+                    )
 
                 for i_l, (layer, rec) in enumerate(recording_full_loaded.items()):
                     ax_ts = axs_ts[i_t] if max_num_layers == 1 else axs_ts[i_l, i_t]
@@ -546,27 +531,23 @@ if __name__ == "__main__":
                         ax_ts_proc.spines["top"].set_visible(False)
                         ax_ts_proc.spines["right"].set_visible(False)
 
-            fig_ts.savefig(visualization_output_folder / f"traces_full_seg{segment_index}.{OUTPUT_FORMAT}", dpi=300)
-            if fig_ts_proc is not None:
-                fig_ts_proc.savefig(visualization_output_folder / f"traces_proc_seg{segment_index}.{OUTPUT_FORMAT}", dpi=300)
 
-        if plot_figpack:
-            if not skip_drift:
-                # add drift map if available
-                if v_drift is not None:
-                    timeseries_tab_items.append(v_drift)
+        if not skip_drift:
+            # add drift map if available
+            if v_drift is not None:
+                timeseries_tab_items.append(v_drift)
 
-                # add motion if available
-                if v_motion is not None:
-                    timeseries_tab_items.append(v_motion)
+            # add motion if available
+            if v_motion is not None:
+                timeseries_tab_items.append(v_motion)
 
-            v_timeseries = vv.TabLayout(items=timeseries_tab_items)
-            try:
-                url = v_timeseries.url(label=f"{session_name} - {recording_name}")
-                logging.info(f"\n{url}\n")
-                visualization_output["timeseries"] = url
-            except Exception as e:
-                logging.info(f"Figpack plotting error.")
+        v_timeseries = vv.TabLayout(items=timeseries_tab_items)
+        try:
+            url = v_timeseries.show(title=f"{session_name} - {recording_name}", inline=False, wait_for_input=False)
+            logging.info(f"\n{url}\n")
+            visualization_output["timeseries"] = url
+        except Exception as e:
+            logging.info(f"Figpack plotting error.")
 
         # sorting summary
         skip_sorting_summary = True
@@ -617,43 +598,40 @@ if __name__ == "__main__":
                 sorter_name = "unknown"
 
             if len(analyzer.unit_ids) > 0:
-                if plot_figpack:
-                    # tab layout with Summary and Quality Metrics
-                    v_qm = sw.plot_quality_metrics(
-                        analyzer,
-                        skip_metrics=["isi_violations_count", "rp_violations"],
-                        include_metrics_data=True,
-                        backend="figpack",
-                        generate_url=False,
-                    ).view
-                    v_sorting = sw.plot_sorting_summary(
-                        analyzer,
-                        displayed_unit_properties=displayed_unit_properties,
-                        extra_unit_properties=extra_unit_properties,
-                        curation=True,
-                        label_choices=LABEL_CHOICES,
-                        backend="figpack",
-                        generate_url=False,
-                    ).view
+                # tab layout with Summary and Quality Metrics
+                v_qm = sw.plot_quality_metrics(
+                    analyzer,
+                    skip_metrics=["isi_violations_count", "rp_violations"],
+                    include_metrics_data=True,
+                    backend="figpack",
+                    hide_unit_selector=False,
+                    display=False
+                ).view
+                v_sorting = sw.plot_sorting_summary(
+                    analyzer,
+                    displayed_unit_properties=displayed_unit_properties,
+                    extra_unit_properties=extra_unit_properties,
+                    curation=True,
+                    backend="figpack",
+                    display=False,
+                ).view
 
-                    v_summary = vv.TabLayout(
-                        items=[
-                            vv.TabLayoutItem(label="Sorting summary", view=v_sorting),
-                            vv.TabLayoutItem(label="Quality Metrics", view=v_qm),
-                        ]
+                v_summary = vv.TabLayout(
+                    items=[
+                        vv.TabLayoutItem(label="Sorting summary", view=v_sorting),
+                        vv.TabLayoutItem(label="Quality Metrics", view=v_qm),
+                    ]
+                )
+
+                try:
+                    url = v_summary.show(
+                        title=f"{session_name} - {recording_name} - {sorter_name} - Sorting Summary",
+                        wait_for_input=False
                     )
-
-                    try:
-                        url = v_summary.url(
-                            label=f"{session_name} - {recording_name} - {sorter_name} - Sorting Summary",
-                            allow_float64=True
-                        )
-                        logging.info(f"\n{url}\n")
-                        visualization_output["sorting_summary"] = url
-                    except Exception as e:
-                        logging.info(f"\tFigpack plotting resulted in an error:\n\t{e}")
-                else:
-                    logging.info("\tSkipping sorting summary visualization for {recording_name}. Figpack client not found.")
+                    logging.info(f"\n{url}\n")
+                    visualization_output["sorting_summary"] = url
+                except Exception as e:
+                    logging.info(f"\tFigpack plotting resulted in an error:\n\t{e}")
             else:
                 logging.info("\tSkipping sorting summary visualization for {recording_name}. No units after curation.")
         else:
@@ -665,9 +643,8 @@ if __name__ == "__main__":
         visualization_notes = visualization_notes.replace('\\"', "%22")
         visualization_notes = visualization_notes.replace("#", "%23")
 
-        if plot_figpack:
-            # remove escape characters
-            visualization_output_file.write_text(visualization_notes)
+        # remove escape characters
+        visualization_output_file.write_text(visualization_notes)
 
         # save vizualization output
         t_visualization_end = time.perf_counter()
