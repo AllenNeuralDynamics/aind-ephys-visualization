@@ -331,7 +331,7 @@ if __name__ == "__main__":
                     peaks=peaks_to_plot,
                     peak_locations=peak_locations_to_plot,
                     sampling_frequency=sampling_frequency,
-                    segment_index=segment_index,
+                    segment_indices=[segment_index],
                     depth_lim=depth_lim,
                     clim=(visualization_params["drift"]["vmin"], visualization_params["drift"]["vmax"]),
                     cmap=visualization_params["drift"]["cmap"],
