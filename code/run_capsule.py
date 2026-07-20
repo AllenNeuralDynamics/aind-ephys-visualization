@@ -304,17 +304,35 @@ if __name__ == "__main__":
                     skip_drift = True
 
         if not skip_drift:
-            fig_drift, axs_drift = plt.subplots(
-                ncols=recording.get_num_segments(), figsize=visualization_params["drift"]["figsize"]
-            )
             y_locs = recording.get_channel_locations()[:, 1]
             depth_lim = [np.min(y_locs), np.max(y_locs)]
 
-            for segment_index in range(recording.get_num_segments()):
-                if recording.get_num_segments() == 1:
-                    ax_drift = axs_drift
-                else:
-                    ax_drift = axs_drift[segment_index]
+            if spike_locations_available:
+                num_segments = recording.get_num_segments()
+                vertical_lines = []
+            elif motion_is_available:
+                # When motion is available, peaks are only for 1 segment since
+                # concatenation is performed before motion estimation. So we only plot 1 segment for drift map
+                # and add vertical lines for segment boundaries if multiple segments are present
+                num_segments = 1
+                vertical_lines = []
+                if recording.get_num_segments() > 1:
+                    vertical_lines  = np.cumsum(
+                        [recording.get_num_samples(segment_index=i) 
+                         for i in range(recording.get_num_segments() - 1)]
+                    ) / sampling_frequency
+            else:
+                num_segments = recording.get_num_segments()
+                vertical_lines = []
+
+            fig_drift, axs_drift = plt.subplots(
+                ncols=num_segments, figsize=visualization_params["drift"]["figsize"]
+            )
+            if num_segments == 1:
+                axs_drift = [axs_drift]
+
+            for segment_index in range(num_segments):
+                ax_drift = axs_drift[segment_index]
                 if spike_locations_available:
                     sorting_analyzer_to_plot = analyzer
                     peaks_to_plot = None
