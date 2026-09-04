@@ -690,13 +690,16 @@ if __name__ == "__main__":
                             else:
                                 state = None
                             url = v_summary.url(
-                                label=f"{session_name} - {recording_name} - {sorter_name} - Sorting Summary", state=state
+                                label=f"{session_name} - {recording_name} - {sorter_name} - Sorting Summary",
+                                state=state,
+                                allow_float64=True
                             )
                             logging.info(f"\n{url}\n")
                             visualization_output["sorting_summary"] = url
 
                         except Exception as e:
-                            logging.info("\tSortingview plotting resulted in an error")
+                            logging.info(f"\tSortingview plotting resulted in an error: {e}")
+
                     else:
                         logging.info(f"\tSkipping sorting summary visualization for {recording_name}. No items to display.")
                 else:
