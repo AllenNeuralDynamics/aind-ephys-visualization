@@ -616,7 +616,7 @@ if __name__ == "__main__":
                 if "snr" in qm.columns:
                     displayed_unit_properties.append("snr")
 
-            amplitudes = si.get_template_extremum_amplitude(analyzer, mode="peak_to_peak")
+            amplitudes = si.get_template_amplitude_on_main_channel(analyzer, peak_mode="peak_to_peak")
             extra_unit_properties["amplitude"] = np.array(list(amplitudes.values()))
 
             # add labels
