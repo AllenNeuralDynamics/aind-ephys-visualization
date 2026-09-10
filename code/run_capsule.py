@@ -9,6 +9,7 @@ import os
 import numpy as np
 from pathlib import Path
 import json
+import pickle
 import time
 import pandas as pd
 import logging
@@ -91,9 +92,9 @@ if __name__ == "__main__":
         with open("params.json", "r") as f:
             visualization_params = json.load(f)
 
-    # Use CO_CPUS env variable if available
-    N_JOBS_CO = os.getenv("CO_CPUS")
-    N_JOBS = int(N_JOBS_CO) if N_JOBS_CO is not None else N_JOBS
+    # Use CO_CPUS/N_JOBS_EXT env variable if available
+    N_JOBS_EXT = os.getenv("CO_CPUS") or os.getenv("N_JOBS_EXT")
+    N_JOBS = int(N_JOBS_EXT) if N_JOBS_EXT is not None else N_JOBS
 
     ecephys_sessions = [p for p in data_folder.iterdir() if "ecephys" in p.name.lower()]
     ecephys_session_folder = None
@@ -182,7 +183,8 @@ if __name__ == "__main__":
         recording_folder = preprocessed_folder / f"preprocessed_{recording_name}"
         analyzer_binary_folder = postprocessed_folder / f"postprocessed_{recording_name}"
         analyzer_zarr_folder = postprocessed_folder / f"postprocessed_{recording_name}.zarr"
-        preprocessed_json_file = preprocessed_folder / f"preprocessedviz_{recording_name}.json"
+        preprocessedviz_file_json = preprocessed_folder / f"preprocessedviz_{recording_name}.json"
+        preprocessedviz_file_pkl = preprocessed_folder / f"preprocessedviz_{recording_name}.pkl"
         qc_file = curation_folder / f"qc_{recording_name}.npy"
         unit_labels_file = curation_folder / f"unit_labels_{recording_name}.csv"
         motion_folder = preprocessed_folder / f"motion_{recording_name}"
@@ -194,8 +196,17 @@ if __name__ == "__main__":
 
         logging.info(f"Visualizing recording: {recording_name}")
 
-        with open(preprocessed_json_file, "r") as f:
-            preprocessing_vizualization_data = json.load(f)
+
+        if preprocessedviz_file_json.is_file():
+            with open(preprocessedviz_file_json, "r") as f:
+                preprocessing_visualization_data = json.load(f)
+        elif preprocessedviz_file_pkl.is_file():
+            with open(preprocessedviz_file_pkl, "rb") as f:
+                preprocessing_visualization_data = pickle.load(f)
+        else:
+            raise FileNotFoundError(
+                "Could not load visualization data from JSON/PKL."
+            )
 
         recording_job_dict = None
         for job_dict in job_dicts:
@@ -239,7 +250,7 @@ if __name__ == "__main__":
         # if spike locations are not available, detect and localize peaks
         if not spike_locations_available:
             if motion_is_available:
-                drift_data = preprocessing_vizualization_data[recording_name]["drift"]
+                drift_data = preprocessing_visualization_data[recording_name]["drift"]
                 recording = si.load(drift_data["recording"], base_folder=preprocessed_folder)
                 if skip_times:
                     recording.reset_times()
@@ -254,19 +265,19 @@ if __name__ == "__main__":
                     skip_drift = True
             else:
                 from spikeinterface.core.node_pipeline import ExtractDenseWaveforms, run_node_pipeline
-                from spikeinterface.sortingcomponents.peak_detection import DetectPeakLocallyExclusive
-                from spikeinterface.sortingcomponents.peak_localization import LocalizeCenterOfMass
+                from spikeinterface.sortingcomponents.peak_detection.locally_exclusive import LocallyExclusivePeakDetector
+                from spikeinterface.sortingcomponents.peak_localization.center_of_mass import LocalizeCenterOfMass
 
                 logging.info(f"\tVisualizing drift maps using detected peaks (no spike sorting available)")
                 # locally_exclusive + pipeline steps LocalizeCenterOfMass + PeakToPeakFeature
-                drift_data = preprocessing_vizualization_data[recording_name]["drift"]
+                drift_data = preprocessing_visualization_data[recording_name]["drift"]
                 try:
                     recording = si.load(drift_data["recording"], base_folder=preprocessed_folder)
                     if skip_times:
                         recording.reset_times()
 
                     # Here we use the node pipeline implementation
-                    peak_detector_node = DetectPeakLocallyExclusive(recording, **visualization_params["drift"]["detection"])
+                    peak_detector_node = LocallyExclusivePeakDetector(recording, **visualization_params["drift"]["detection"])
                     extract_dense_waveforms_node = ExtractDenseWaveforms(
                         recording,
                         ms_before=visualization_params["drift"]["localization"]["ms_before"],
@@ -293,17 +304,35 @@ if __name__ == "__main__":
                     skip_drift = True
 
         if not skip_drift:
-            fig_drift, axs_drift = plt.subplots(
-                ncols=recording.get_num_segments(), figsize=visualization_params["drift"]["figsize"]
-            )
             y_locs = recording.get_channel_locations()[:, 1]
             depth_lim = [np.min(y_locs), np.max(y_locs)]
 
-            for segment_index in range(recording.get_num_segments()):
-                if recording.get_num_segments() == 1:
-                    ax_drift = axs_drift
-                else:
-                    ax_drift = axs_drift[segment_index]
+            if spike_locations_available:
+                num_segments = recording.get_num_segments()
+                vertical_lines = []
+            elif motion_is_available:
+                # When motion is available, peaks are only for 1 segment since
+                # concatenation is performed before motion estimation. So we only plot 1 segment for drift map
+                # and add vertical lines for segment boundaries if multiple segments are present
+                num_segments = 1
+                vertical_lines = []
+                if recording.get_num_segments() > 1:
+                    vertical_lines  = np.cumsum(
+                        [recording.get_num_samples(segment_index=i) 
+                         for i in range(recording.get_num_segments() - 1)]
+                    ) / sampling_frequency
+            else:
+                num_segments = recording.get_num_segments()
+                vertical_lines = []
+
+            fig_drift, axs_drift = plt.subplots(
+                ncols=num_segments, figsize=visualization_params["drift"]["figsize"]
+            )
+            if num_segments == 1:
+                axs_drift = [axs_drift]
+
+            for segment_index in range(num_segments):
+                ax_drift = axs_drift[segment_index]
                 if spike_locations_available:
                     sorting_analyzer_to_plot = analyzer
                     peaks_to_plot = None
@@ -320,7 +349,7 @@ if __name__ == "__main__":
                     peaks=peaks_to_plot,
                     peak_locations=peak_locations_to_plot,
                     sampling_frequency=sampling_frequency,
-                    segment_index=segment_index,
+                    segment_indices=[segment_index],
                     depth_lim=depth_lim,
                     clim=(visualization_params["drift"]["vmin"], visualization_params["drift"]["vmax"]),
                     cmap=visualization_params["drift"]["cmap"],
@@ -393,7 +422,7 @@ if __name__ == "__main__":
         logging.info(f"\tVisualizing traces")
         timeseries_tab_items = []
 
-        timeseries_data = preprocessing_vizualization_data[recording_name]["timeseries"]
+        timeseries_data = preprocessing_visualization_data[recording_name]["timeseries"]
         recording_full_dict = timeseries_data["full"]
         recording_proc_dict = timeseries_data["proc"]
 
@@ -620,51 +649,63 @@ if __name__ == "__main__":
 
             if len(analyzer.unit_ids) > 0:
                 if plot_kachery:
-                    # tab layout with Summary and Quality Metrics
-                    v_qm = sw.plot_quality_metrics(
-                        analyzer,
-                        skip_metrics=["isi_violations_count", "rp_violations"],
-                        include_metrics_data=True,
-                        backend="sortingview",
-                        generate_url=False,
-                    ).view
-                    v_sorting = sw.plot_sorting_summary(
-                        analyzer,
-                        displayed_unit_properties=displayed_unit_properties,
-                        extra_unit_properties=extra_unit_properties,
-                        curation=True,
-                        label_choices=LABEL_CHOICES,
-                        backend="sortingview",
-                        generate_url=False,
-                    ).view
-
-                    v_summary = vv.TabLayout(
-                        items=[
-                            vv.TabLayoutItem(label="Sorting summary", view=v_sorting),
-                            vv.TabLayoutItem(label="Quality Metrics", view=v_qm),
-                        ]
-                    )
-
-                    try:
-                        # pre-generate gh for curation
-                        if GH_CURATION_REPO is not None:
-                            gh_path = f"{GH_CURATION_REPO}/{session_name}/{recording_name}/{sorter_name}/curation.json"
-                            state = dict(sortingCuration=gh_path)
-                        else:
-                            state = None
-                        url = v_summary.url(
-                            label=f"{session_name} - {recording_name} - {sorter_name} - Sorting Summary",
-                            state=state,
-                            allow_float64=True
+                    items = []
+                    required_extensions = ["correlograms", "spike_amplitudes", "unit_locations", "template_similarity"]
+                    missing_extensions = [ext for ext in required_extensions if not analyzer.has_extension(ext)]
+                    if len(missing_extensions) > 0:
+                        logging.info(
+                            f"\tSkipping sorting summary visualization for {recording_name}. "
+                            f"Missing required extensions: {missing_extensions}"
                         )
-                        logging.info(f"\n{url}\n")
-                        visualization_output["sorting_summary"] = url
-                    except Exception as e:
-                        logging.info(f"\tSortingview plotting resulted in an error:\n\t{e}")
+                    else:
+                        v_sorting = sw.plot_sorting_summary(
+                            analyzer,
+                            displayed_unit_properties=displayed_unit_properties,
+                            extra_unit_properties=extra_unit_properties,
+                            curation=True,
+                            label_choices=LABEL_CHOICES,
+                            backend="sortingview",
+                            generate_url=False,
+                        ).view
+                        items.append(vv.TabLayoutItem(label="Sorting summary", view=v_sorting))
+
+                    if analyzer.has_extension("quality_metrics"):
+                        v_qm = sw.plot_quality_metrics(
+                            analyzer,
+                            skip_metrics=["isi_violations_count", "rp_violations"],
+                            include_metrics_data=True,
+                            backend="sortingview",
+                            generate_url=False,
+                        ).view
+                        items.append(vv.TabLayoutItem(label="Quality Metrics", view=v_qm))
+
+                    if len(items) > 0:
+                        v_summary = vv.TabLayout(items=items)
+
+                        try:
+                            # pre-generate gh for curation
+                            if GH_CURATION_REPO is not None:
+                                gh_path = f"{GH_CURATION_REPO}/{session_name}/{recording_name}/{sorter_name}/curation.json"
+                                state = dict(sortingCuration=gh_path)
+                            else:
+                                state = None
+                            url = v_summary.url(
+                                label=f"{session_name} - {recording_name} - {sorter_name} - Sorting Summary",
+                                state=state,
+                                allow_float64=True
+                            )
+                            logging.info(f"\n{url}\n")
+                            visualization_output["sorting_summary"] = url
+
+                        except Exception as e:
+                            logging.info(f"\tSortingview plotting resulted in an error: {e}")
+
+                    else:
+                        logging.info(f"\tSkipping sorting summary visualization for {recording_name}. No items to display.")
                 else:
-                    logging.info("\tSkipping sorting summary visualization for {recording_name}. Kachery client not found.")
+                    logging.info(f"\tSkipping sorting summary visualization for {recording_name}. Kachery client not found.")
             else:
-                logging.info("\tSkipping sorting summary visualization for {recording_name}. No units after curation.")
+                logging.info(f"\tSkipping sorting summary visualization for {recording_name}. No units after curation.")
         else:
             logging.info(f"\tSkipping sorting summary visualization for {recording_name}. No sorting information available.")
 
@@ -688,7 +729,7 @@ if __name__ == "__main__":
             process_type=ProcessName.EPHYS_VISUALIZATION,
             stage=ProcessStage.PROCESSING,
             name="Ephys visualization",
-            experimenters=["Alessio Buccino"],
+            experimenters=["AIND Pipeline"],
             code=Code(
                 url=URL,
                 version=VERSION, # either release or git commit
