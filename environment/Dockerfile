@@ -22,7 +22,7 @@ RUN pip install -U --no-cache-dir \
     pyvips==2.2.1 \
     s3fs==2025.5.1 \
     sortingview==0.14.2 \
-    spikeinterface[full,widgets]==0.104.9 \
+    spikeinterface[full,widgets]==0.104.7 \
     wavpack-numcodecs==0.2.2
 
 COPY postInstall /
