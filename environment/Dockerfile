@@ -1,8 +1,4 @@
-<<<<<<< HEAD
 # hash:sha256:a4d6aed77b091deb5f29a5a4feec2ec811c0dc3684e0a650eefacad572f032cf
-=======
-# hash:sha256:850e873c2e9efc39149ff9020c7ee99033017734b100ca488390f63f68a0dd4d
->>>>>>> origin/main
 ARG REGISTRY_HOST
 FROM $REGISTRY_HOST/codeocean/mambaforge3:24.5.0-0-python3.12.4-ubuntu22.04
 
