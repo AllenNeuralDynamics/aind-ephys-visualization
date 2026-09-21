@@ -21,7 +21,6 @@ import spikeinterface.widgets as sw
 
 # needed to load extensions
 import spikeinterface.postprocessing as spost
-import spikeinterface.qualitymetrics as sqm
 
 # VIZ
 import matplotlib.pyplot as plt
@@ -587,8 +586,14 @@ if __name__ == "__main__":
                 if "snr" in qm.columns:
                     displayed_unit_properties.append("snr")
 
-            amplitudes = si.get_template_extremum_amplitude(analyzer, mode="peak_to_peak")
-            extra_unit_properties["amplitude"] = np.array(list(amplitudes.values()))
+            amplitudes = np.array(
+                si.get_template_amplitude_on_main_channel(
+                    analyzer,
+                    peak_mode="peak_to_peak",
+                    with_dict=False
+                )
+            )
+            extra_unit_properties["amplitude"] = amplitudes
 
             # add labels
             if unit_labels_file.is_file():
