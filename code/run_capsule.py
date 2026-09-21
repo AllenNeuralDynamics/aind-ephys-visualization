@@ -692,7 +692,6 @@ if __name__ == "__main__":
                             url = v_summary.url(
                                 label=f"{session_name} - {recording_name} - {sorter_name} - Sorting Summary",
                                 state=state,
-                                allow_float64=True
                             )
                             logging.info(f"\n{url}\n")
                             visualization_output["sorting_summary"] = url
