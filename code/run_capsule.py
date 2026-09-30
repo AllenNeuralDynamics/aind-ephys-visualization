@@ -122,7 +122,7 @@ def run() -> None:
                 model={
                     "pipeline_name": pipeline_name,
                     "acquisition_name": acquisition_name,
-                    "process_name": "Ephys visualization"
+                    "process_name": "Visualization"
                 }
             )
 
