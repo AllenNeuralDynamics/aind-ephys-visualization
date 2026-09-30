@@ -86,6 +86,7 @@ def run() -> None:
         with open("params.json", "r") as f:
             visualization_params = json.load(f)
 
+    # TODO: temporary - remove from params.json when logging is distributed by pipeline
     LOGGING = visualization_params.pop("logging", None)
 
     # Use CO_CPUS/N_JOBS_EXT env variable if available
