@@ -22,7 +22,6 @@ import spikeinterface.widgets as sw
 
 # needed to load extensions
 import spikeinterface.postprocessing as spost
-import spikeinterface.qualitymetrics as sqm
 
 # VIZ
 import matplotlib.pyplot as plt
@@ -304,17 +303,35 @@ if __name__ == "__main__":
                     skip_drift = True
 
         if not skip_drift:
-            fig_drift, axs_drift = plt.subplots(
-                ncols=recording.get_num_segments(), figsize=visualization_params["drift"]["figsize"]
-            )
             y_locs = recording.get_channel_locations()[:, 1]
             depth_lim = [np.min(y_locs), np.max(y_locs)]
 
-            for segment_index in range(recording.get_num_segments()):
-                if recording.get_num_segments() == 1:
-                    ax_drift = axs_drift
-                else:
-                    ax_drift = axs_drift[segment_index]
+            if spike_locations_available:
+                num_segments = recording.get_num_segments()
+                vertical_lines = []
+            elif motion_is_available:
+                # When motion is available, peaks are only for 1 segment since
+                # concatenation is performed before motion estimation. So we only plot 1 segment for drift map
+                # and add vertical lines for segment boundaries if multiple segments are present
+                num_segments = 1
+                vertical_lines = []
+                if recording.get_num_segments() > 1:
+                    vertical_lines  = np.cumsum(
+                        [recording.get_num_samples(segment_index=i) 
+                         for i in range(recording.get_num_segments() - 1)]
+                    ) / sampling_frequency
+            else:
+                num_segments = recording.get_num_segments()
+                vertical_lines = []
+
+            fig_drift, axs_drift = plt.subplots(
+                ncols=num_segments, figsize=visualization_params["drift"]["figsize"]
+            )
+            if num_segments == 1:
+                axs_drift = [axs_drift]
+
+            for segment_index in range(num_segments):
+                ax_drift = axs_drift[segment_index]
                 if spike_locations_available:
                     sorting_analyzer_to_plot = analyzer
                     peaks_to_plot = None
@@ -331,7 +348,7 @@ if __name__ == "__main__":
                     peaks=peaks_to_plot,
                     peak_locations=peak_locations_to_plot,
                     sampling_frequency=sampling_frequency,
-                    segment_index=segment_index,
+                    segment_indices=[segment_index],
                     depth_lim=depth_lim,
                     clim=(visualization_params["drift"]["vmin"], visualization_params["drift"]["vmax"]),
                     cmap=visualization_params["drift"]["cmap"],
@@ -598,8 +615,14 @@ if __name__ == "__main__":
                 if "snr" in qm.columns:
                     displayed_unit_properties.append("snr")
 
-            amplitudes = si.get_template_extremum_amplitude(analyzer, mode="peak_to_peak")
-            extra_unit_properties["amplitude"] = np.array(list(amplitudes.values()))
+            amplitudes = np.array(
+                si.get_template_amplitude_on_main_channel(
+                    analyzer,
+                    peak_mode="peak_to_peak",
+                    with_dict=False
+                )
+            )
+            extra_unit_properties["amplitude"] = amplitudes
 
             # add labels
             if unit_labels_file.is_file():
@@ -672,13 +695,15 @@ if __name__ == "__main__":
                             else:
                                 state = None
                             url = v_summary.url(
-                                label=f"{session_name} - {recording_name} - {sorter_name} - Sorting Summary", state=state
+                                label=f"{session_name} - {recording_name} - {sorter_name} - Sorting Summary",
+                                state=state,
                             )
                             logging.info(f"\n{url}\n")
                             visualization_output["sorting_summary"] = url
 
                         except Exception as e:
-                            logging.info("\tSortingview plotting resulted in an error")
+                            logging.info(f"\tSortingview plotting resulted in an error: {e}")
+
                     else:
                         logging.info(f"\tSkipping sorting summary visualization for {recording_name}. No items to display.")
                 else:
