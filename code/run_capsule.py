@@ -32,8 +32,9 @@ from aind_data_schema.core.processing import DataProcess, ProcessStage
 from aind_data_schema.components.identifiers import Code
 from aind_data_schema_models.process_names import ProcessName
 
-URL = "https://github.com/AllenNeuralDynamics/aind-ephys-visualization"
-VERSION = "1.0"
+
+URL = os.getenv("CODE_REPO", "https://github.com/AllenNeuralDynamics/aind-ephys-visualization")
+VERSION = os.getenv("CODE_VERSION", "1.0")
 
 GH_CURATION_REPO = os.getenv("GH_CURATION_REPO")
 LABEL_CHOICES = ["noise", "MUA", "SUA", "pMUA", "pSUA"]
