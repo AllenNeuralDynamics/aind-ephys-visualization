@@ -9,6 +9,7 @@ import os
 import numpy as np
 from pathlib import Path
 import json
+import pickle
 import time
 import pandas as pd
 import logging
@@ -21,7 +22,6 @@ import spikeinterface.widgets as sw
 
 # needed to load extensions
 import spikeinterface.postprocessing as spost
-import spikeinterface.qualitymetrics as sqm
 
 # VIZ
 import matplotlib.pyplot as plt
@@ -32,15 +32,9 @@ from aind_data_schema.core.processing import DataProcess, ProcessStage
 from aind_data_schema.components.identifiers import Code
 from aind_data_schema_models.process_names import ProcessName
 
-try:
-    from aind_log_utils import log
 
-    HAVE_AIND_LOG_UTILS = True
-except ImportError:
-    HAVE_AIND_LOG_UTILS = False
-
-URL = "https://github.com/AllenNeuralDynamics/aind-ephys-visualization"
-VERSION = "1.0"
+URL = os.getenv("CODE_REPO", "https://github.com/AllenNeuralDynamics/aind-ephys-visualization")
+VERSION = os.getenv("CODE_VERSION", "1.0")
 
 
 data_folder = Path("../data/")
@@ -49,6 +43,11 @@ results_folder = Path("../results/")
 
 # Define argument parser
 parser = argparse.ArgumentParser(description="Curate ecephys data")
+
+output_format_group = parser.add_mutually_exclusive_group()
+output_format_help = "Format for output figures. Default 'png'"
+output_format_group.add_argument("static_output_format", nargs="?", default="png", help=output_format_help)
+output_format_group.add_argument("--output-format", default="png", help=output_format_help)
 
 n_jobs_group = parser.add_mutually_exclusive_group()
 n_jobs_help = (
@@ -62,11 +61,13 @@ parser.add_argument("--params", default=None, help="Path to the parameters file 
 
 
 
-if __name__ == "__main__":
+def run() -> None:
+    """Entrypoint for the visualization capsule."""
     args = parser.parse_args()
 
     N_JOBS = args.static_n_jobs or args.n_jobs
     N_JOBS = int(N_JOBS) if not N_JOBS.startswith("0.") else float(N_JOBS)
+    OUTPUT_FORMAT = args.static_output_format or args.output_format
     PARAMS = args.params
 
     if PARAMS is not None:
@@ -83,40 +84,49 @@ if __name__ == "__main__":
         with open("params.json", "r") as f:
             visualization_params = json.load(f)
 
-    # Use CO_CPUS env variable if available
-    N_JOBS_CO = os.getenv("CO_CPUS")
-    N_JOBS = int(N_JOBS_CO) if N_JOBS_CO is not None else N_JOBS
+    # TODO: temporary - remove from params.json when logging is distributed by pipeline
+    LOGGING = visualization_params.pop("logging", None)
 
-    ecephys_sessions = [p for p in data_folder.iterdir() if "ecephys" in p.name.lower()]
-    ecephys_session_folder = None
-    logging_set = False
-    if len(ecephys_sessions) == 1:
-        ecephys_session_folder = ecephys_sessions[0]
-        if HAVE_AIND_LOG_UTILS:
-            try:
-                # look for subject.json and data_description.json files
-                subject_json = ecephys_session_folder / "subject.json"
-                subject_id = "undefined"
-                if subject_json.is_file():
-                    subject_data = json.load(open(subject_json, "r"))
-                    subject_id = subject_data["subject_id"]
+    # Use CO_CPUS/N_JOBS_EXT env variable if available
+    N_JOBS_EXT = os.getenv("CO_CPUS") or os.getenv("N_JOBS_EXT")
+    N_JOBS = int(N_JOBS_EXT) if N_JOBS_EXT is not None else N_JOBS
 
-                data_description_json = ecephys_session_folder / "data_description.json"
-                session_name = "undefined"
-                if data_description_json.is_file():
-                    data_description = json.load(open(data_description_json, "r"))
-                    session_name = data_description["name"]
-                log.setup_logging(
-                    "Visualize Ecephys",
-                    subject_id=subject_id,
-                    asset_name=session_name,
-                )
-                logging_set = True
-            except:
-                pass
+    # setup logging before any other logging call
+    if LOGGING is None:
+        logging.basicConfig(level="INFO", stream=sys.stdout, format="%(message)s")
+    else:
+        if LOGGING["package"] == "logging":
+            logging_cfg = LOGGING.get("logging_cfg", {})
+            logging.basicConfig(stream=sys.stdout, **logging_cfg)
+        elif LOGGING["package"] == "log-schema":
+            import log_schema
 
-    if not logging_set:
-        logging.basicConfig(level=logging.INFO, stream=sys.stdout, format="%(message)s")
+            pipeline_name = LOGGING.get("pipeline_name", "AIND Ephys Pipeline")
+            acquisition_name = LOGGING.get("acquisition_name", None)
+
+            if acquisition_name is None:
+                data_description_json = list(data_folder.glob("**/data_description.json"))
+                if len(data_description_json) > 0:
+                    data_description_json = data_description_json[0]
+                    with open(data_description_json, "r") as f:
+                        data_description = json.load(f)
+                    acquisition_name = data_description["name"]
+
+            config = LOGGING.get("logging_cfg")
+            if config is not None and len(config) == 0:
+                config = None
+            log_schema.setup_logging(
+                config=config,
+                model={
+                    "pipeline_name": pipeline_name,
+                    "acquisition_name": acquisition_name,
+                    "process_name": "Visualization"
+                }
+            )
+
+    logging.info("Begin processing...", extra={"event_type": "stage_start"})
+
+    session_name = "undefined"
 
     data_process_prefix = "data_process_visualization"
 
@@ -141,7 +151,6 @@ if __name__ == "__main__":
         preprocessed_folder = data_folder
         curation_folder = data_folder
         spikesorted_folder = data_folder
-        data_processes_spikesorting_folder = data_folder
 
     # check figpack client
     figpack_set = os.environ.get("FIGPACK_API_KEY", None)
@@ -156,6 +165,7 @@ if __name__ == "__main__":
         error_file = results_folder / recording_name / "error.txt"
         error_file.parent.mkdir(exist_ok=True)
         error_file.write_text("Figpack not found")
+        return
 
     # Retrieve recording_names from preprocessed folder
     recording_names = [
@@ -181,8 +191,8 @@ if __name__ == "__main__":
         recording_folder = preprocessed_folder / f"preprocessed_{recording_name}"
         analyzer_binary_folder = postprocessed_folder / f"postprocessed_{recording_name}"
         analyzer_zarr_folder = postprocessed_folder / f"postprocessed_{recording_name}.zarr"
-        preprocessed_json_file = preprocessed_folder / f"preprocessedviz_{recording_name}.json"
-        qc_file = curation_folder / f"qc_{recording_name}.npy"
+        preprocessedviz_file_json = preprocessed_folder / f"preprocessedviz_{recording_name}.json"
+        preprocessedviz_file_pkl = preprocessed_folder / f"preprocessedviz_{recording_name}.pkl"
         unit_labels_file = curation_folder / f"unit_labels_{recording_name}.csv"
         motion_folder = preprocessed_folder / f"motion_{recording_name}"
         visualization_output_process_json = results_folder / f"{data_process_prefix}_{recording_name}.json"
@@ -191,8 +201,17 @@ if __name__ == "__main__":
 
         logging.info(f"Visualizing recording: {recording_name}")
 
-        with open(preprocessed_json_file, "r") as f:
-            preprocessing_vizualization_data = json.load(f)
+
+        if preprocessedviz_file_json.is_file():
+            with open(preprocessedviz_file_json, "r") as f:
+                preprocessing_visualization_data = json.load(f)
+        elif preprocessedviz_file_pkl.is_file():
+            with open(preprocessedviz_file_pkl, "rb") as f:
+                preprocessing_visualization_data = pickle.load(f)
+        else:
+            raise FileNotFoundError(
+                "Could not load visualization data from JSON/PKL."
+            )
 
         recording_job_dict = None
         for job_dict in job_dicts:
@@ -236,7 +255,7 @@ if __name__ == "__main__":
         # if spike locations are not available, detect and localize peaks
         if not spike_locations_available:
             if motion_is_available:
-                drift_data = preprocessing_vizualization_data[recording_name]["drift"]
+                drift_data = preprocessing_visualization_data[recording_name]["drift"]
                 recording = si.load(drift_data["recording"], base_folder=preprocessed_folder)
                 if skip_times:
                     recording.reset_times()
@@ -251,19 +270,19 @@ if __name__ == "__main__":
                     skip_drift = True
             else:
                 from spikeinterface.core.node_pipeline import ExtractDenseWaveforms, run_node_pipeline
-                from spikeinterface.sortingcomponents.peak_detection import DetectPeakLocallyExclusive
-                from spikeinterface.sortingcomponents.peak_localization import LocalizeCenterOfMass
+                from spikeinterface.sortingcomponents.peak_detection.locally_exclusive import LocallyExclusivePeakDetector
+                from spikeinterface.sortingcomponents.peak_localization.center_of_mass import LocalizeCenterOfMass
 
                 logging.info(f"\tVisualizing drift maps using detected peaks (no spike sorting available)")
                 # locally_exclusive + pipeline steps LocalizeCenterOfMass + PeakToPeakFeature
-                drift_data = preprocessing_vizualization_data[recording_name]["drift"]
+                drift_data = preprocessing_visualization_data[recording_name]["drift"]
                 try:
                     recording = si.load(drift_data["recording"], base_folder=preprocessed_folder)
                     if skip_times:
                         recording.reset_times()
 
                     # Here we use the node pipeline implementation
-                    peak_detector_node = DetectPeakLocallyExclusive(recording, **visualization_params["drift"]["detection"])
+                    peak_detector_node = LocallyExclusivePeakDetector(recording, **visualization_params["drift"]["detection"])
                     extract_dense_waveforms_node = ExtractDenseWaveforms(
                         recording,
                         ms_before=visualization_params["drift"]["localization"]["ms_before"],
@@ -290,17 +309,35 @@ if __name__ == "__main__":
                     skip_drift = True
 
         if not skip_drift:
-            fig_drift, axs_drift = plt.subplots(
-                ncols=recording.get_num_segments(), figsize=visualization_params["drift"]["figsize"]
-            )
             y_locs = recording.get_channel_locations()[:, 1]
             depth_lim = [np.min(y_locs), np.max(y_locs)]
 
-            for segment_index in range(recording.get_num_segments()):
-                if recording.get_num_segments() == 1:
-                    ax_drift = axs_drift
-                else:
-                    ax_drift = axs_drift[segment_index]
+            if spike_locations_available:
+                num_segments = recording.get_num_segments()
+                vertical_lines = []
+            elif motion_is_available:
+                # When motion is available, peaks are only for 1 segment since
+                # concatenation is performed before motion estimation. So we only plot 1 segment for drift map
+                # and add vertical lines for segment boundaries if multiple segments are present
+                num_segments = 1
+                vertical_lines = []
+                if recording.get_num_segments() > 1:
+                    vertical_lines  = np.cumsum(
+                        [recording.get_num_samples(segment_index=i) 
+                         for i in range(recording.get_num_segments() - 1)]
+                    ) / sampling_frequency
+            else:
+                num_segments = recording.get_num_segments()
+                vertical_lines = []
+
+            fig_drift, axs_drift = plt.subplots(
+                ncols=num_segments, figsize=visualization_params["drift"]["figsize"]
+            )
+            if num_segments == 1:
+                axs_drift = [axs_drift]
+
+            for segment_index in range(num_segments):
+                ax_drift = axs_drift[segment_index]
                 if spike_locations_available:
                     sorting_analyzer_to_plot = analyzer
                     peaks_to_plot = None
@@ -317,7 +354,7 @@ if __name__ == "__main__":
                     peaks=peaks_to_plot,
                     peak_locations=peak_locations_to_plot,
                     sampling_frequency=sampling_frequency,
-                    segment_index=segment_index,
+                    segment_indices=[segment_index],
                     depth_lim=depth_lim,
                     clim=(visualization_params["drift"]["vmin"], visualization_params["drift"]["vmax"]),
                     cmap=visualization_params["drift"]["cmap"],
@@ -377,7 +414,7 @@ if __name__ == "__main__":
         logging.info(f"\tVisualizing traces")
         timeseries_tab_items = []
 
-        timeseries_data = preprocessing_vizualization_data[recording_name]["timeseries"]
+        timeseries_data = preprocessing_visualization_data[recording_name]["timeseries"]
         recording_full_dict = timeseries_data["full"]
         recording_proc_dict = timeseries_data["proc"]
 
@@ -531,7 +568,6 @@ if __name__ == "__main__":
                         ax_ts_proc.spines["top"].set_visible(False)
                         ax_ts_proc.spines["right"].set_visible(False)
 
-
         if not skip_drift:
             # add drift map if available
             if v_drift is not None:
@@ -566,8 +602,14 @@ if __name__ == "__main__":
                 if "snr" in qm.columns:
                     displayed_unit_properties.append("snr")
 
-            amplitudes = si.get_template_extremum_amplitude(analyzer, mode="peak_to_peak")
-            extra_unit_properties["amplitude"] = np.array(list(amplitudes.values()))
+            amplitudes = np.array(
+                si.get_template_amplitude_on_main_channel(
+                    analyzer,
+                    peak_mode="peak_to_peak",
+                    with_dict=False
+                )
+            )
+            extra_unit_properties["amplitude"] = amplitudes
 
             # add labels
             if unit_labels_file.is_file():
@@ -633,7 +675,7 @@ if __name__ == "__main__":
                 except Exception as e:
                     logging.info(f"\tFigpack plotting resulted in an error:\n\t{e}")
             else:
-                logging.info("\tSkipping sorting summary visualization for {recording_name}. No units after curation.")
+                logging.info(f"\tSkipping sorting summary visualization for {recording_name}. No units after curation.")
         else:
             logging.info(f"\tSkipping sorting summary visualization for {recording_name}. No sorting information available.")
 
@@ -656,7 +698,7 @@ if __name__ == "__main__":
             process_type=ProcessName.EPHYS_VISUALIZATION,
             stage=ProcessStage.PROCESSING,
             name="Ephys visualization",
-            experimenters=["Alessio Buccino"],
+            experimenters=["AIND Pipeline"],
             code=Code(
                 url=URL,
                 version=VERSION, # either release or git commit
@@ -676,3 +718,12 @@ if __name__ == "__main__":
     elapsed_time_visualization_all = np.round(t_visualization_end_all - t_visualization_start_all, 2)
 
     logging.info(f"VISUALIZATION time: {elapsed_time_visualization_all}s")
+    logging.info("Pipeline stage completed", extra={"event_type": "stage_complete"})
+
+
+if __name__ == "__main__":
+    try:
+        run()
+    except Exception:
+        logging.exception("Pipeline stage failed", extra={"event_type": "stage_error"})
+        raise
