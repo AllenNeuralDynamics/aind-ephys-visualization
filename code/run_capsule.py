@@ -154,18 +154,12 @@ def run() -> None:
 
     # check figpack client
     figpack_set = os.environ.get("FIGPACK_API_KEY", None)
-
     if figpack_set:
         figpack_upload = os.environ.get("FIGPACK_UPLOAD", "0")
         figpack_bucket = os.environ.get("FIGPACK_BUCKET", "default")
         logging.info(f"Figpack enabled - upload: {figpack_upload} - bucket: {figpack_bucket}")
     else:
         logging.info(f"Figpack disabled - FIGPACK_API_KEY not found. Skipping visualization")
-        # make error.txt: figpack not found and return
-        error_file = results_folder / recording_name / "error.txt"
-        error_file.parent.mkdir(exist_ok=True)
-        error_file.write_text("Figpack not found")
-        return
 
     # Retrieve recording_names from preprocessed folder
     recording_names = [
@@ -184,6 +178,13 @@ def run() -> None:
 
     # loop through block-streams
     for recording_name in recording_names:
+        if not figpack_set:
+            # make error.txt: figpack not found and return
+            error_file = results_folder / recording_name / "error.txt"
+            error_file.parent.mkdir(exist_ok=True)
+            error_file.write_text("Figpack not found")
+            continue
+
         t_visualization_start = time.perf_counter()
         datetime_start_visualization = datetime.now()
         visualization_output = {}
