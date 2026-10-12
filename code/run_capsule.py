@@ -36,6 +36,7 @@ from aind_data_schema_models.process_names import ProcessName
 URL = os.getenv("CODE_REPO", "https://github.com/AllenNeuralDynamics/aind-ephys-visualization")
 VERSION = os.getenv("CODE_VERSION", "1.0")
 
+LABEL_CHOICES = ["good", "mua", "noise"]
 
 data_folder = Path("../data/")
 scratch_folder = Path("../scratch")
@@ -586,13 +587,7 @@ def run() -> None:
         except Exception as e:
             logging.info(f"Figpack plotting error.")
 
-        # sorting summary
-        skip_sorting_summary = True
-        if analyzer is not None:
-            logging.info(f"\tVisualizing sorting summary")
-            skip_sorting_summary = False
-
-        if not skip_sorting_summary:
+        if analyzer is not None and len(analyzer.unit_ids) > 0:
             displayed_unit_properties = []
             extra_unit_properties = {}
             # add firing rate, snr, and amplitude columns
@@ -640,8 +635,33 @@ def run() -> None:
             else:
                 sorter_name = "unknown"
 
-            if len(analyzer.unit_ids) > 0:
-                # tab layout with Summary and Quality Metrics
+            items = []
+            required_extensions = ["correlograms", "spike_amplitudes", "unit_locations", "template_similarity"]
+            missing_extensions = [ext for ext in required_extensions if not analyzer.has_extension(ext)]
+            if len(missing_extensions) > 0:
+                logging.info(
+                    f"\tSkipping sorting summary visualization for {recording_name}. "
+                    f"Missing required extensions: {missing_extensions}"
+                )
+            else:
+                v_sorting = sw.plot_sorting_summary(
+                    analyzer,
+                    displayed_unit_properties=displayed_unit_properties,
+                    extra_unit_properties=extra_unit_properties,
+                    label_choices=LABEL_CHOICES,
+                    curation=True,
+                    backend="figpack",
+                    display=False,
+                ).view
+                
+                items.append(vv.TabLayoutItem(label="Sorting summary", view=v_sorting))
+
+            if not analyzer.has_extension("quality_metrics"):
+                logging.info(
+                    f"\tSkipping quality metrics visualization for {recording_name}. "
+                    "No quality metrics extension available."
+                )
+            else:
                 v_qm = sw.plot_quality_metrics(
                     analyzer,
                     skip_metrics=["isi_violations_count", "rp_violations"],
@@ -650,21 +670,11 @@ def run() -> None:
                     hide_unit_selector=False,
                     display=False
                 ).view
-                v_sorting = sw.plot_sorting_summary(
-                    analyzer,
-                    displayed_unit_properties=displayed_unit_properties,
-                    extra_unit_properties=extra_unit_properties,
-                    curation=True,
-                    backend="figpack",
-                    display=False,
-                ).view
 
-                v_summary = vv.TabLayout(
-                    items=[
-                        vv.TabLayoutItem(label="Sorting summary", view=v_sorting),
-                        vv.TabLayoutItem(label="Quality Metrics", view=v_qm),
-                    ]
-                )
+                items.append(vv.TabLayoutItem(label="Quality Metrics", view=v_qm))
+
+            if len(items) > 0:
+                v_summary = vv.TabLayout(items=items)                
 
                 try:
                     url = v_summary.show(
@@ -676,7 +686,7 @@ def run() -> None:
                 except Exception as e:
                     logging.info(f"\tFigpack plotting resulted in an error:\n\t{e}")
             else:
-                logging.info(f"\tSkipping sorting summary visualization for {recording_name}. No units after curation.")
+                logging.info(f"\tSkipping sorting summary visualization for {recording_name}. No items to display.")
         else:
             logging.info(f"\tSkipping sorting summary visualization for {recording_name}. No sorting information available.")
 
