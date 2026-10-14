@@ -25,7 +25,7 @@ import spikeinterface.postprocessing as spost
 
 # VIZ
 import matplotlib.pyplot as plt
-import sortingview.views as vv
+import figpack.views as vv
 
 # AIND
 from aind_data_schema.core.processing import DataProcess, ProcessStage
@@ -36,8 +36,7 @@ from aind_data_schema_models.process_names import ProcessName
 URL = os.getenv("CODE_REPO", "https://github.com/AllenNeuralDynamics/aind-ephys-visualization")
 VERSION = os.getenv("CODE_VERSION", "1.0")
 
-GH_CURATION_REPO = os.getenv("GH_CURATION_REPO")
-LABEL_CHOICES = ["noise", "MUA", "SUA", "pMUA", "pSUA"]
+LABEL_CHOICES = ["good", "mua", "noise"]
 
 data_folder = Path("../data/")
 scratch_folder = Path("../scratch")
@@ -153,17 +152,15 @@ def run() -> None:
         preprocessed_folder = data_folder
         curation_folder = data_folder
         spikesorted_folder = data_folder
-        data_processes_spikesorting_folder = data_folder
 
-    # check kachery client
-    kachery_set = os.environ.get("KACHERY_API_KEY", None)
-
-    if kachery_set:
-        logging.info(f"Kachery plots enabled")
-        plot_kachery = True
+    # check figpack client
+    figpack_set = os.environ.get("FIGPACK_API_KEY", None)
+    if figpack_set:
+        figpack_upload = os.environ.get("FIGPACK_UPLOAD", "0")
+        figpack_bucket = os.environ.get("FIGPACK_BUCKET", "default")
+        logging.info(f"Figpack enabled - upload: {figpack_upload} - bucket: {figpack_bucket}")
     else:
-        logging.info(f"Kachery plots disabled. KACHERY_API_KEY not found")
-        plot_kachery = False
+        logging.info(f"Figpack disabled - FIGPACK_API_KEY not found. Skipping visualization")
 
     # Retrieve recording_names from preprocessed folder
     recording_names = [
@@ -182,6 +179,13 @@ def run() -> None:
 
     # loop through block-streams
     for recording_name in recording_names:
+        if not figpack_set:
+            # make error.txt: figpack not found and return
+            error_file = results_folder / recording_name / "error.txt"
+            error_file.parent.mkdir(exist_ok=True)
+            error_file.write_text("Figpack not found")
+            continue
+
         t_visualization_start = time.perf_counter()
         datetime_start_visualization = datetime.now()
         visualization_output = {}
@@ -191,14 +195,11 @@ def run() -> None:
         analyzer_zarr_folder = postprocessed_folder / f"postprocessed_{recording_name}.zarr"
         preprocessedviz_file_json = preprocessed_folder / f"preprocessedviz_{recording_name}.json"
         preprocessedviz_file_pkl = preprocessed_folder / f"preprocessedviz_{recording_name}.pkl"
-        qc_file = curation_folder / f"qc_{recording_name}.npy"
         unit_labels_file = curation_folder / f"unit_labels_{recording_name}.csv"
         motion_folder = preprocessed_folder / f"motion_{recording_name}"
         visualization_output_process_json = results_folder / f"{data_process_prefix}_{recording_name}.json"
         # save vizualization output
         visualization_output_file = results_folder / f"visualization_{recording_name}.json"
-        visualization_output_folder = results_folder / f"visualization_{recording_name}"
-        visualization_output_folder.mkdir(exist_ok=True)
 
         logging.info(f"Visualizing recording: {recording_name}")
 
@@ -366,20 +367,13 @@ def run() -> None:
                 ax_drift.spines["top"].set_visible(False)
                 ax_drift.spines["right"].set_visible(False)
 
-            drift_map_fig_file = visualization_output_folder / f"drift_map.{OUTPUT_FORMAT}"
+            # figpack needs a png
+            drift_map_fig_file = scratch_folder / f"{recording_name}_map.png"
             fig_drift.savefig(drift_map_fig_file, dpi=300)
 
-            # make a sorting view View
-            v_drift = None
-            if plot_kachery:
-                if OUTPUT_FORMAT != "png":
-                    # kachery needs a png
-                    drift_map_fig_file = scratch_folder / f"{recording_name}_map.png"
-                    fig_drift.savefig(drift_map_fig_file, dpi=300)
-
-                v_drift = vv.TabLayoutItem(
-                    label=f"Drift map", view=vv.Image(image_path=str(drift_map_fig_file))
-                )
+            v_drift = vv.TabLayoutItem(
+                label=f"Drift map", view=vv.Image(image_path_or_data=str(drift_map_fig_file))
+            )
 
             # plot motion
             v_motion = None
@@ -409,20 +403,14 @@ def run() -> None:
                         amplitude_cmap=cmap,
                         scatter_decimate=scatter_decimate,
                     )
-                    motion_fig_file = visualization_output_folder / f"motion.{OUTPUT_FORMAT}"
+
+                    motion_fig_file = scratch_folder / f"{recording_name}_motion.png"
                     fig_motion.savefig(motion_fig_file, dpi=300)
 
-                    # make a sorting view View
-                    if plot_kachery:
-                        if OUTPUT_FORMAT != "png":
-                            # kachery needs a png
-                            motion_fig_file = scratch_folder / f"{recording_name}_motion.png"
-                            fig_motion.savefig(motion_fig_file, dpi=300)
-
-                        v_motion = vv.TabLayoutItem(
-                            label=f"Motion",
-                            view=vv.Image(image_path=str(motion_fig_file)),
-                        )
+                    v_motion = vv.TabLayoutItem(
+                        label=f"Motion",
+                        view=vv.Image(image_path_or_data=str(motion_fig_file)),
+                    )
 
         # timeseries
         logging.info(f"\tVisualizing traces")
@@ -507,45 +495,44 @@ def run() -> None:
                 time_range = np.round(
                     np.array([t_start, t_start + visualization_params["timeseries"]["snippet_duration_s"]]), 1
                 )
-                if plot_kachery:
-                    try:
-                        w_full = sw.plot_traces(
-                            recording_full_loaded,
+                try:
+                    w_full = sw.plot_traces(
+                        recording_full_loaded,
+                        order_channel_by_depth=True,
+                        time_range=time_range,
+                        segment_index=segment_index,
+                        clim=clims_full,
+                        mode="map",
+                        backend="figpack",
+                        display=False,
+                    )
+                    if recording_proc_dict is not None:
+                        w_proc = sw.plot_traces(
+                            recording_proc_loaded,
                             order_channel_by_depth=True,
                             time_range=time_range,
                             segment_index=segment_index,
-                            clim=clims_full,
+                            clim=clims_proc,
                             mode="map",
-                            backend="sortingview",
-                            generate_url=False,
+                            backend="figpack",
+                            display=False,
                         )
-                        if recording_proc_dict is not None:
-                            w_proc = sw.plot_traces(
-                                recording_proc_loaded,
-                                order_channel_by_depth=True,
-                                time_range=time_range,
-                                segment_index=segment_index,
-                                clim=clims_proc,
-                                mode="map",
-                                backend="sortingview",
-                                generate_url=False,
-                            )
-                            view = vv.Splitter(
-                                direction="horizontal",
-                                item1=vv.LayoutItem(w_full.view),
-                                item2=vv.LayoutItem(w_proc.view),
-                            )
-                        else:
-                            view = w_full.view
-                        v_item = vv.TabLayoutItem(
-                            label=f"Timeseries - Segment {segment_index} - Time: {time_range}", view=view
+                        view = vv.Splitter(
+                            direction="horizontal",
+                            item1=vv.LayoutItem(w_full.view),
+                            item2=vv.LayoutItem(w_proc.view),
                         )
-                        timeseries_tab_items.append(v_item)
-                    except Exception as e:
-                        logging.info(
-                            f"\t\tError plotting traces with SortingView for "
-                            f"{recording_name} - {segment_index} - {time_range}."
-                        )
+                    else:
+                        view = w_full.view
+                    v_item = vv.TabLayoutItem(
+                        label=f"Timeseries - Segment {segment_index} - Time: {time_range}", view=view
+                    )
+                    timeseries_tab_items.append(v_item)
+                except Exception as e:
+                    logging.info(
+                        f"\t\tError plotting traces with Figpack for "
+                        f"{recording_name} - {segment_index} - {time_range}."
+                    )
 
                 for i_l, (layer, rec) in enumerate(recording_full_loaded.items()):
                     ax_ts = axs_ts[i_t] if max_num_layers == 1 else axs_ts[i_l, i_t]
@@ -583,35 +570,24 @@ def run() -> None:
                         ax_ts_proc.spines["top"].set_visible(False)
                         ax_ts_proc.spines["right"].set_visible(False)
 
-            fig_ts.savefig(visualization_output_folder / f"traces_full_seg{segment_index}.{OUTPUT_FORMAT}", dpi=300)
-            if fig_ts_proc is not None:
-                fig_ts_proc.savefig(visualization_output_folder / f"traces_proc_seg{segment_index}.{OUTPUT_FORMAT}", dpi=300)
+        if not skip_drift:
+            # add drift map if available
+            if v_drift is not None:
+                timeseries_tab_items.append(v_drift)
 
-        if plot_kachery:
-            if not skip_drift:
-                # add drift map if available
-                if v_drift is not None:
-                    timeseries_tab_items.append(v_drift)
+            # add motion if available
+            if v_motion is not None:
+                timeseries_tab_items.append(v_motion)
 
-                # add motion if available
-                if v_motion is not None:
-                    timeseries_tab_items.append(v_motion)
+        v_timeseries = vv.TabLayout(items=timeseries_tab_items)
+        try:
+            url = v_timeseries.show(title=f"{session_name} - {recording_name}", inline=False, wait_for_input=False)
+            logging.info(f"\n{url}\n")
+            visualization_output["timeseries"] = url
+        except Exception as e:
+            logging.info(f"Figpack plotting error.")
 
-            v_timeseries = vv.TabLayout(items=timeseries_tab_items)
-            try:
-                url = v_timeseries.url(label=f"{session_name} - {recording_name}")
-                logging.info(f"\n{url}\n")
-                visualization_output["timeseries"] = url
-            except Exception as e:
-                logging.info(f"Figurl-Sortingview plotting error.")
-
-        # sorting summary
-        skip_sorting_summary = True
-        if analyzer is not None:
-            logging.info(f"\tVisualizing sorting summary")
-            skip_sorting_summary = False
-
-        if not skip_sorting_summary:
+        if analyzer is not None and len(analyzer.unit_ids) > 0:
             displayed_unit_properties = []
             extra_unit_properties = {}
             # add firing rate, snr, and amplitude columns
@@ -659,64 +635,58 @@ def run() -> None:
             else:
                 sorter_name = "unknown"
 
-            if len(analyzer.unit_ids) > 0:
-                if plot_kachery:
-                    items = []
-                    required_extensions = ["correlograms", "spike_amplitudes", "unit_locations", "template_similarity"]
-                    missing_extensions = [ext for ext in required_extensions if not analyzer.has_extension(ext)]
-                    if len(missing_extensions) > 0:
-                        logging.info(
-                            f"\tSkipping sorting summary visualization for {recording_name}. "
-                            f"Missing required extensions: {missing_extensions}"
-                        )
-                    else:
-                        v_sorting = sw.plot_sorting_summary(
-                            analyzer,
-                            displayed_unit_properties=displayed_unit_properties,
-                            extra_unit_properties=extra_unit_properties,
-                            curation=True,
-                            label_choices=LABEL_CHOICES,
-                            backend="sortingview",
-                            generate_url=False,
-                        ).view
-                        items.append(vv.TabLayoutItem(label="Sorting summary", view=v_sorting))
-
-                    if analyzer.has_extension("quality_metrics"):
-                        v_qm = sw.plot_quality_metrics(
-                            analyzer,
-                            skip_metrics=["isi_violations_count", "rp_violations"],
-                            include_metrics_data=True,
-                            backend="sortingview",
-                            generate_url=False,
-                        ).view
-                        items.append(vv.TabLayoutItem(label="Quality Metrics", view=v_qm))
-
-                    if len(items) > 0:
-                        v_summary = vv.TabLayout(items=items)
-
-                        try:
-                            # pre-generate gh for curation
-                            if GH_CURATION_REPO is not None:
-                                gh_path = f"{GH_CURATION_REPO}/{session_name}/{recording_name}/{sorter_name}/curation.json"
-                                state = dict(sortingCuration=gh_path)
-                            else:
-                                state = None
-                            url = v_summary.url(
-                                label=f"{session_name} - {recording_name} - {sorter_name} - Sorting Summary",
-                                state=state,
-                            )
-                            logging.info(f"\n{url}\n")
-                            visualization_output["sorting_summary"] = url
-
-                        except Exception as e:
-                            logging.info(f"\tSortingview plotting resulted in an error: {e}")
-
-                    else:
-                        logging.info(f"\tSkipping sorting summary visualization for {recording_name}. No items to display.")
-                else:
-                    logging.info(f"\tSkipping sorting summary visualization for {recording_name}. Kachery client not found.")
+            items = []
+            required_extensions = ["correlograms", "spike_amplitudes", "unit_locations", "template_similarity"]
+            missing_extensions = [ext for ext in required_extensions if not analyzer.has_extension(ext)]
+            if len(missing_extensions) > 0:
+                logging.info(
+                    f"\tSkipping sorting summary visualization for {recording_name}. "
+                    f"Missing required extensions: {missing_extensions}"
+                )
             else:
-                logging.info(f"\tSkipping sorting summary visualization for {recording_name}. No units after curation.")
+                v_sorting = sw.plot_sorting_summary(
+                    analyzer,
+                    displayed_unit_properties=displayed_unit_properties,
+                    extra_unit_properties=extra_unit_properties,
+                    label_choices=LABEL_CHOICES,
+                    curation=True,
+                    backend="figpack",
+                    display=False,
+                ).view
+                
+                items.append(vv.TabLayoutItem(label="Sorting summary", view=v_sorting))
+
+            if not analyzer.has_extension("quality_metrics"):
+                logging.info(
+                    f"\tSkipping quality metrics visualization for {recording_name}. "
+                    "No quality metrics extension available."
+                )
+            else:
+                v_qm = sw.plot_quality_metrics(
+                    analyzer,
+                    skip_metrics=["isi_violations_count", "rp_violations"],
+                    include_metrics_data=True,
+                    backend="figpack",
+                    hide_unit_selector=False,
+                    display=False
+                ).view
+
+                items.append(vv.TabLayoutItem(label="Quality Metrics", view=v_qm))
+
+            if len(items) > 0:
+                v_summary = vv.TabLayout(items=items)                
+
+                try:
+                    url = v_summary.show(
+                        title=f"{session_name} - {recording_name} - {sorter_name} - Sorting Summary",
+                        wait_for_input=False
+                    )
+                    logging.info(f"\n{url}\n")
+                    visualization_output["sorting_summary"] = url
+                except Exception as e:
+                    logging.info(f"\tFigpack plotting resulted in an error:\n\t{e}")
+            else:
+                logging.info(f"\tSkipping sorting summary visualization for {recording_name}. No items to display.")
         else:
             logging.info(f"\tSkipping sorting summary visualization for {recording_name}. No sorting information available.")
 
@@ -726,9 +696,8 @@ def run() -> None:
         visualization_notes = visualization_notes.replace('\\"', "%22")
         visualization_notes = visualization_notes.replace("#", "%23")
 
-        if plot_kachery:
-            # remove escape characters
-            visualization_output_file.write_text(visualization_notes)
+        # remove escape characters
+        visualization_output_file.write_text(visualization_notes)
 
         # save vizualization output
         t_visualization_end = time.perf_counter()
