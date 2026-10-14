@@ -1,14 +1,10 @@
-# hash:sha256:0d231f4c85a803b9e7c25eea227089e2bf8b2ada849f866512e74d3bc18359cf
+# hash:sha256:09765dbeaee918cdeccb92a0237ca0ef2e5504b98f66aebbd4b0fd2b781e1c24
 ARG REGISTRY_HOST
 FROM $REGISTRY_HOST/codeocean/mambaforge3:24.5.0-0-python3.12.4-ubuntu22.04
 
 ARG DEBIAN_FRONTEND=noninteractive
 ARG GIT_ASKPASS
 COPY git-ask-pass /
-
-ENV FIGPACK_API_KEY=35725b3d95eacc9c1c00895ba2ef051110d26925cf0b61cba3060806faa81783
-ENV FIGPACK_BUCKET=aind-figpack-client
-ENV FIGPACK_UPLOAD=1
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
