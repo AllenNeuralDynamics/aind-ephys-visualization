@@ -450,7 +450,7 @@ def run() -> None:
             for segment_index in range(rec.get_num_segments()):
                 if not rec.has_time_vector(segment_index=segment_index):
                     times = rec.get_times(segment_index=segment_index)
-                    rec.set_times(times, segment_index=segment_index, with_warning=False)
+                    rec.set_times(times, segment_index=segment_index)
             recording_full_loaded[layer] = rec
         clims_proc = {}
         if recording_proc_dict is not None:
@@ -470,7 +470,7 @@ def run() -> None:
                 for segment_index in range(rec.get_num_segments()):
                     if not rec.has_time_vector(segment_index=segment_index):
                         times = rec.get_times(segment_index=segment_index)
-                        rec.set_times(times, segment_index=segment_index, with_warning=False)
+                        rec.set_times(times, segment_index=segment_index)
                 recording_proc_loaded[layer] = rec
         else:
             logging.info(f"\tPreprocessed timeseries not avaliable")
