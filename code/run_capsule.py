@@ -585,7 +585,7 @@ def run() -> None:
             logging.info(f"\n{url}\n")
             visualization_output["timeseries"] = url
         except Exception as e:
-            logging.info(f"Figpack plotting error.")
+            logging.info(f"Figpack plotting resulted in an error:\n\t{e}")
 
         if analyzer is not None and len(analyzer.unit_ids) > 0:
             displayed_unit_properties = []
