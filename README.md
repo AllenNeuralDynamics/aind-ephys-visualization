@@ -27,7 +27,7 @@ The `data/` folder must include:
 
 ### Parameters
 
-The `code/run` script takes no arguments.
+Parameters are read from a `params.json` file that must be in the root folder of the capsule (next to `code/`, i.e. `../params.json` from `code/`), with the step parameters in the `visualization` section.
 
 A list of visualization parameters can in the `code/params.json`:
 
