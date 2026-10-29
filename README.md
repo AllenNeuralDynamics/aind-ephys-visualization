@@ -27,48 +27,9 @@ The `data/` folder must include:
 
 ### Parameters
 
-The `code/run` script takes no arguments.
+Parameters are read from a `params.json` file that must be in the root folder of the capsule (next to `code/`, i.e. `../params.json` from `code/`), with the step parameters in the `visualization` section.
 
-A list of visualization parameters can in the `code/params.json`:
-
-```python
-{
-    "job_kwargs": {
-        "chunk_duration": "1s",
-        "progress_bar": false
-    },
-    "visualization": {
-        "timeseries": {
-            "n_snippets_per_segment": 2,
-            "snippet_duration_s": 0.5,
-            "skip": false
-        },
-        "drift": {
-            "detection": {
-                "peak_sign": "neg", 
-                "detect_threshold": 5, 
-                "exclude_sweep_ms": 0.1
-            },
-            "localization": {
-                "ms_before": 0.1, 
-                "ms_after": 0.3, 
-                "radius_um": 100.0
-            },
-            "n_skip": 30,
-            "alpha": 0.15,
-            "vmin": -200,
-            "vmax": 0,
-            "cmap": "Greys_r",
-            "figsize": [10, 10]
-        },
-        "motion": {
-            "cmap": "Greys_r", 
-            "scatter_decimate": 15, 
-            "figsize": [15, 10]
-        }
-    }
-}
-```
+A full list of parameters can be found in the  `aind-ephys-pipeline` repository, and are defined in this [schema](https://github.com/AllenNeuralDynamics/aind-ephys-pipeline/blob/1.5.0/pipeline/default_params_schema.json).
 
 ### Output
 
