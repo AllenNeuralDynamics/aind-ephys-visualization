@@ -92,7 +92,7 @@ def run() -> None:
 
     data_process_prefix = "data_process_visualization"
 
-    job_kwargs = visualization_params.pop("job_kwargs")
+    job_kwargs = {**full_params.get("global_job_kwargs", {}), **visualization_params.pop("job_kwargs", {})}
     job_kwargs["n_jobs"] = N_JOBS
     si.set_global_job_kwargs(**job_kwargs)
 
